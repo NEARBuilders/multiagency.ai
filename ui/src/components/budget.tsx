@@ -12,9 +12,10 @@ export function Budget({ budget }: { budget: TokenBudget }) {
       <div className="text-xs uppercase tracking-wide text-muted-foreground font-mono">
         {budget.tokenId}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Tile label="budget" value={formatTokenAmount(budget.budget, budget.tokenId)} />
         <Tile label="allocated" value={formatTokenAmount(budget.allocated, budget.tokenId)} />
+        <Tile label="committed" value={formatTokenAmount(budget.committed, budget.tokenId)} />
         <Tile label="paid" value={formatTokenAmount(budget.paid, budget.tokenId)} />
         <Tile label="remaining" value={formatTokenAmount(budget.remaining, budget.tokenId)} />
       </div>

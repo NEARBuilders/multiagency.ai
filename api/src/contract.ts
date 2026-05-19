@@ -5,7 +5,7 @@ import { z } from "every-plugin/zod";
 const applicationKind = z.enum(["founder", "contributor", "client"]);
 
 const projectStatus = z.enum(["active", "paused", "archived"]);
-const visibility = z.enum(["public", "private"]);
+const visibility = z.enum(["public", "unlisted", "private"]);
 const onboardingStatus = z.enum(["pending", "complete", "expired"]);
 const proposalStatus = z.enum([
   "InProgress",
@@ -22,6 +22,28 @@ const slug = z
   .min(1)
   .max(80)
   .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/, "lowercase letters, digits, and hyphens");
+
+// NEAR account ID — 2-64 chars, lowercase alphanumeric with optional `-`/`_`/`.` separators.
+// Must start and end with alphanumeric; no consecutive separators. Matches nearcore's rules well enough
+// to reject foot-guns like emoji, spaces, or stray punctuation without rejecting real accounts.
+export const nearAccountId = z
+  .string()
+  .trim()
+  .min(2)
+  .max(64)
+  .regex(
+    /^[a-z0-9]+(?:[-_][a-z0-9]+)*(?:\.[a-z0-9]+(?:[-_][a-z0-9]+)*)*$/,
+    "must be a valid NEAR account id (lowercase letters, digits, dashes, underscores, dots)",
+  );
+
+// HTTP(S) URL only — blocks `javascript:`, `data:`, `file:` and other XSS-prone URL schemes.
+// Zod 4's `.url()` is permissive about scheme; this refinement is the actual safety check.
+export const httpUrl = z
+  .string()
+  .trim()
+  .url()
+  .max(500)
+  .refine((s) => /^https?:\/\//i.test(s), "must start with http:// or https://");
 
 export const baseAmount = z
   .string()
@@ -56,6 +78,7 @@ const project = z.object({
   slug: z.string(),
   title: z.string(),
   description: z.string().nullable(),
+  repository: z.string().nullable(),
   nearnListingId: z.string().nullable(),
   status: projectStatus,
   visibility,
@@ -63,7 +86,7 @@ const project = z.object({
   updatedAt: z.date(),
 });
 
-export const publicProject = project.omit({ description: true });
+export const publicProject = project.omit({ description: true, nearnListingId: true });
 
 const nearnListing = z.object({
   slug: z.string(),
@@ -103,18 +126,19 @@ const tokenBudget = z.object({
   tokenId: z.string(),
   budget: z.string(),
   allocated: z.string(),
+  committed: z.string(),
   paid: z.string(),
   remaining: z.string(),
 });
 
-const allocation = z.object({
+const budget = z.object({
   id: z.string(),
   projectId: z.string(),
   tokenId: z.string(),
   amount: z.string(),
   note: z.string().nullable(),
   actorAccountId: z.string(),
-  relatedAllocationId: z.string().nullable(),
+  relatedBudgetId: z.string().nullable(),
   createdAt: z.date(),
 });
 
@@ -139,6 +163,14 @@ export const proposalPublicItem = z.object({
   receiverId: z.string(),
   amount: z.string(),
   submissionTime: z.string(),
+  // Per-voter record from Sputnik. Empty {} when not available (e.g. cache-served terminal proposals);
+  // UI renders empty as "no tally" rather than "0 votes."
+  votes: z.record(z.string(), z.enum(["Approve", "Reject", "Remove"])),
+});
+
+export const storageStatusOutput = z.object({
+  tokenId: z.string(),
+  status: z.object({ total: z.string(), available: z.string() }).nullable(),
 });
 
 export const proposalListItem = proposalPublicItem.extend({
@@ -150,24 +182,6 @@ export const proposalListItem = proposalPublicItem.extend({
       projectTitle: z.string(),
     })
     .nullable(),
-});
-
-const settings = z.object({
-  id: z.string(),
-  daoAccountId: z.string(),
-  nearnAccountId: z.string().nullable(),
-  name: z.string(),
-  headline: z.string().nullable(),
-  tagline: z.string().nullable(),
-  contactEmail: z.string().nullable(),
-  websiteUrl: z.string().nullable(),
-  docsUrl: z.string().nullable(),
-  description: z.string().nullable(),
-  metadata: z.string().nullable(),
-  adminRoleName: z.string().nullable(),
-  approverRoleName: z.string().nullable(),
-  requestorRoleName: z.string().nullable(),
-  updatedAt: z.date(),
 });
 
 export const contract = oc.router({
@@ -234,7 +248,7 @@ export const contract = oc.router({
 
       adminGet: oc
         .route({ method: "GET", path: "/admin/projects/{slug}" })
-        .input(z.object({ slug: z.string() }))
+        .input(z.object({ slug }))
         .output(
           z.object({
             project,
@@ -268,13 +282,14 @@ export const contract = oc.router({
             slug,
             title: z.string().min(1).max(200),
             description: z.string().max(16000).optional(),
+            repository: httpUrl.optional(),
             nearnListingId: z.string().max(200).optional(),
             status: projectStatus.default("active"),
             visibility: visibility.default("private"),
           }),
         )
         .output(z.object({ project }))
-        .errors({ UNAUTHORIZED, FORBIDDEN }),
+        .errors({ UNAUTHORIZED, FORBIDDEN, BAD_REQUEST }),
 
       adminUpdate: oc
         .route({ method: "PATCH", path: "/admin/projects/{id}" })
@@ -283,12 +298,19 @@ export const contract = oc.router({
             id: z.string(),
             title: z.string().min(1).max(200).optional(),
             description: z.string().max(16000).nullable().optional(),
+            repository: httpUrl.optional(),
             nearnListingId: z.string().max(200).nullable().optional(),
             status: projectStatus.optional(),
             visibility: visibility.optional(),
           }),
         )
         .output(z.object({ project }))
+        .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
+
+      adminDelete: oc
+        .route({ method: "DELETE", path: "/admin/projects/{id}" })
+        .input(z.object({ id: z.string() }))
+        .output(z.object({ deleted: z.literal(true) }))
         .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
     },
   },
@@ -376,9 +398,9 @@ export const contract = oc.router({
       .errors({ UNAUTHORIZED, FORBIDDEN }),
   },
 
-  allocations: {
+  budgets: {
     adminList: oc
-      .route({ method: "GET", path: "/admin/allocations" })
+      .route({ method: "GET", path: "/admin/budgets" })
       .input(
         paginationInput.extend({
           projectId: z.string().optional(),
@@ -387,14 +409,14 @@ export const contract = oc.router({
       )
       .output(
         z.object({
-          data: z.array(allocation),
+          data: z.array(budget),
           nextCursor: z.string().nullable(),
         }),
       )
       .errors({ UNAUTHORIZED, FORBIDDEN }),
 
     adminCreate: oc
-      .route({ method: "POST", path: "/admin/projects/{projectId}/allocations" })
+      .route({ method: "POST", path: "/admin/projects/{projectId}/budgets" })
       .input(
         z.object({
           projectId: z.string(),
@@ -403,11 +425,11 @@ export const contract = oc.router({
           note: z.string().max(2000).optional(),
         }),
       )
-      .output(z.object({ allocation }))
+      .output(z.object({ budget }))
       .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
 
     adminDeallocate: oc
-      .route({ method: "POST", path: "/admin/projects/{projectId}/allocations/deallocate" })
+      .route({ method: "POST", path: "/admin/projects/{projectId}/budgets/deallocate" })
       .input(
         z.object({
           projectId: z.string(),
@@ -416,11 +438,11 @@ export const contract = oc.router({
           note: z.string().max(2000).optional(),
         }),
       )
-      .output(z.object({ allocation }))
-      .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+      .output(z.object({ budget }))
+      .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
 
     adminTransfer: oc
-      .route({ method: "POST", path: "/admin/allocations/transfer" })
+      .route({ method: "POST", path: "/admin/budgets/transfer" })
       .input(
         z
           .object({
@@ -438,8 +460,8 @@ export const contract = oc.router({
             path: ["toProjectId"],
           }),
       )
-      .output(z.object({ from: allocation, to: allocation }))
-      .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+      .output(z.object({ from: budget, to: budget }))
+      .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
   },
 
   billings: {
@@ -471,6 +493,12 @@ export const contract = oc.router({
       )
       .output(z.object({ billing }))
       .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
+
+    adminDelete: oc
+      .route({ method: "DELETE", path: "/admin/billings/{id}" })
+      .input(z.object({ id: z.string() }))
+      .output(z.object({ deleted: z.literal(true) }))
+      .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
   },
 
   proposals: {
@@ -530,6 +558,11 @@ export const contract = oc.router({
         ),
       }),
     ),
+
+    getStorageStatus: oc
+      .route({ method: "GET", path: "/tokens/storage-status" })
+      .input(z.object({ tokenId: z.string().min(1).max(200) }))
+      .output(storageStatusOutput),
   },
 
   treasury: {
@@ -556,7 +589,28 @@ export const contract = oc.router({
             z.object({
               tokenId: z.string(),
               balance: z.string(),
-              totalAllocated: z.string(),
+              totalBudgeted: z.string(),
+              available: z.string(),
+            }),
+          ),
+        }),
+      )
+      .errors({ UNAUTHORIZED, FORBIDDEN }),
+
+    getRollups: oc
+      .route({ method: "GET", path: "/admin/treasury/rollups" })
+      .output(
+        z.object({
+          rollups: z.array(
+            z.object({
+              tokenId: z.string(),
+              balance: z.string(),
+              budgeted: z.string(),
+              allocated: z.string(),
+              committed: z.string(),
+              paid: z.string(),
+              remaining: z.string(),
+              available: z.string(),
             }),
           ),
         }),
@@ -657,46 +711,57 @@ export const contract = oc.router({
         nearnAccountId: z.string().nullable(),
         websiteUrl: z.string().nullable(),
         docsUrl: z.string().nullable(),
-        daoAccountId: z.string(),
-        isPlaceholder: z.boolean(),
+        orgAccountId: z.string(),
+        networkPinned: z.boolean(),
       }),
     ),
 
     adminGet: oc
       .route({ method: "GET", path: "/admin/settings" })
-      .output(z.object({ settings }))
+      .output(
+        z.object({
+          // Row identity — read-only here. To change the active DAO, edit env vars and restart
+          // (multi-tenant native: each DAO has its own settings row keyed by this account).
+          orgAccountId: z.string(),
+          network: z.enum(["mainnet", "testnet"]),
+          // Editable for admins of this deployment — resolved DB → env → hardcoded.
+          editable: z.object({
+            nearnAccountId: z.string().nullable(),
+            websiteUrl: z.string().nullable(),
+            docsUrl: z.string().nullable(),
+            description: z.string().nullable(),
+            contactEmail: z.string().nullable(),
+          }),
+          // Read-only — codebase-level brand identity and Sputnik role names.
+          readOnly: z.object({
+            name: z.string(),
+            headline: z.string().nullable(),
+            tagline: z.string().nullable(),
+            adminRoleName: z.string(),
+            approverRoleName: z.string(),
+            requestorRoleName: z.string(),
+          }),
+          audit: z
+            .object({
+              createdBy: z.string(),
+              createdAt: z.string(),
+              updatedBy: z.string(),
+              updatedAt: z.string(),
+            })
+            .nullable(),
+        }),
+      )
       .errors({ UNAUTHORIZED, FORBIDDEN }),
 
     adminUpdate: oc
       .route({ method: "PATCH", path: "/admin/settings" })
       .input(
         z.object({
-          daoAccountId: z.string().min(1).max(200).optional(),
-          nearnAccountId: z.string().max(200).nullable().optional(),
-          name: z.string().min(1).max(200).optional(),
-          headline: z.string().max(200).nullable().optional(),
-          tagline: z.string().max(2000).nullable().optional(),
-          contactEmail: z.string().email().max(320).nullable().optional(),
-          websiteUrl: z.string().url().max(500).nullable().optional(),
-          docsUrl: z.string().url().max(500).nullable().optional(),
-          description: z.string().max(8000).nullable().optional(),
-          metadata: z.string().max(16000).nullable().optional(),
-          adminRoleName: z.string().max(80).nullable().optional(),
-          approverRoleName: z.string().max(80).nullable().optional(),
-          requestorRoleName: z.string().max(80).nullable().optional(),
-        }),
-      )
-      .output(z.object({ settings }))
-      .errors({ UNAUTHORIZED, FORBIDDEN }),
-  },
-
-  bootstrap: {
-    config: oc
-      .route({ method: "POST", path: "/bootstrap/config" })
-      .input(
-        z.object({
-          daoAccountId: z.string().min(1).max(64),
-          adminRoleName: z.string().min(1).max(80).optional(),
+          nearnAccountId: z.string().trim().min(1).max(120).nullable(),
+          websiteUrl: httpUrl.nullable(),
+          docsUrl: httpUrl.nullable(),
+          description: z.string().trim().min(1).max(500).nullable(),
+          contactEmail: z.string().trim().email().max(120).nullable(),
         }),
       )
       .output(z.object({ ok: z.literal(true) }))

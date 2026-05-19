@@ -5,7 +5,7 @@ description: Plain-English summary of the per-project work order — what each e
 
 # Work order
 
-> **Not legal or tax advice.** These pages describe how MultiAgency LLC is structured and operates — one working example, not a prescription. Entity types, tax treatment, and worker-classification rules vary by jurisdiction and change over time. Before forking this model, get qualified legal and tax counsel in the jurisdiction where your agency and contributors operate. This is an early draft, published to gather feedback — expect it to change.
+> **Not legal or tax advice.** These pages describe how MultiAgency LLC is structured and operates — one working example, not a prescription. Entity types, tax treatment, and worker-classification rules vary by jurisdiction and change over time. Before adapting this model, get qualified legal and tax counsel in the jurisdiction where your agency and contributors operate. This is an early draft, published to gather feedback — expect it to change.
 
 A work order is the **per-project, per-engagement scope** for a contributor. It pairs with the [services agreement](/docs/services-agreement): the master sets the rules; the work order names what is actually being built, for how much, by when, with what IP terms.
 

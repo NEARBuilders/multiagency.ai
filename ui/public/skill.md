@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Understand and interact with this Agency Dashboard deployment as a runtime-composed site on NEAR, extending the everything.dev runtime. This deployment is maintained by MultiAgency. The underlying template is at github.com/MultiAgency/dashboard — fork-and-customize per agency.
+Understand and interact with this Agency Dashboard deployment as a runtime-composed site on NEAR, extending the everything.dev runtime. This deployment is maintained by MultiAgency. The underlying template is at github.com/MultiAgency/dashboard — instantiate via `bunx everything-dev init` to customize per agency.
 
 ## Core model
 
@@ -23,7 +23,7 @@ Understand and interact with this Agency Dashboard deployment as a runtime-compo
 
 - The bootstrap site is published from `dev.everything.near/everything.dev`.
 - This site extends the everything.dev bootstrap (`bos://dev.everything.near/everything.dev`).
-- Agency-specific surfaces — public projects directory, apply form, and the authenticated admin workspace (projects, contributors, allocations, billings, applications, settings) — are wired end-to-end via the API plugin. Admin routes are gated server-side by Sputnik DAO role membership.
+- Agency-specific surfaces — public projects directory, apply form, and the authenticated admin workspace (projects, contributors, budgets, billings, applications) — are wired end-to-end via the API plugin. Admin routes are gated server-side by Sputnik DAO role membership.
 - Multiple sites may share the same host configuration.
 - Host URLs can stay stable while published runtime records change over time.
 - The project is meant to be continuously built over and around.

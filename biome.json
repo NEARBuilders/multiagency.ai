@@ -51,7 +51,8 @@
       "!!**/plugins/**/types/**/*.d.ts",
       "!!**/env.d.ts",
       "!!**/virtual-modules.d.ts",
-      "!!bos.config.json"
+      "!!bos.config.json",
+      "!!api/src/db/migrations"
     ],
     "ignoreUnknown": true
   },

@@ -28,8 +28,8 @@ UI typically runs at http://localhost:3003. API and auth ports may vary by local
 
 Business logic is organized into independent plugins loaded via Module Federation:
 
-- **`api/`** — Owns the agency surface today (applications, projects, contributors, allocations, billings, assignments, settings, treasury, nearn, team, me) plus shared auth middleware. As agency-specific plugins ship, business logic can migrate out of `api/` into its own plugin.
-- **`plugins/`** — No plugins currently registered. New plugins live here, each self-contained with its own `contract.ts`, `index.ts`, `rspack.config.js`, and `package.json`. The canonical scaffold lives upstream at [`NEARBuilders/everything-dev/plugins/_template`](https://github.com/NEARBuilders/everything-dev/tree/main/plugins/_template); the dashboard fork has not validated the end-to-end scaffolding flow.
+- **`api/`** — Owns the agency surface today (applications, projects, contributors, budgets, billings, assignments, settings, treasury, nearn, team, me) plus shared auth middleware. As agency-specific plugins ship, business logic can migrate out of `api/` into its own plugin.
+- **`plugins/`** — No plugins currently registered. New plugins live here, each self-contained with its own `contract.ts`, `index.ts`, `rspack.config.js`, and `package.json`. The canonical scaffold lives upstream at [`NEARBuilders/everything-dev/plugins/_template`](https://github.com/NEARBuilders/everything-dev/tree/main/plugins/_template); the dashboard has not validated the end-to-end scaffolding flow.
 
 The UI accesses plugin routes via namespaced clients: `apiClient.<pluginName>.<routeName>()`.
 

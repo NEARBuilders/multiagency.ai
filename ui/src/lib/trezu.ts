@@ -1,19 +1,19 @@
-export function trezuProposalUrl(daoAccountId: string, proposalId: string): string {
-  return `https://trezu.app/${daoAccountId}/requests/${proposalId}`;
+export function trezuProposalUrl(orgAccountId: string, proposalId: string): string {
+  return `https://trezu.app/${orgAccountId}/requests/${proposalId}`;
 }
 
-export function trezuTreasuryUrl(daoAccountId: string): string {
-  return `https://trezu.app/${daoAccountId}`;
+export function trezuTreasuryUrl(orgAccountId: string): string {
+  return `https://trezu.app/${orgAccountId}`;
 }
 
 export function trezuPaymentUrl(
-  daoAccountId: string,
+  orgAccountId: string,
   options: {
     receiverAddress?: string;
     token?: { tokenId: string; symbol: string; network: string; decimals: number };
   },
 ): string {
-  const url = new URL(`https://trezu.app/${daoAccountId}/payments`);
+  const url = new URL(`https://trezu.app/${orgAccountId}/payments`);
   if (options.receiverAddress) {
     url.searchParams.set("address", options.receiverAddress);
   }

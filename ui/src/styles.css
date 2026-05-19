@@ -13,6 +13,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Blueprint-grid atmosphere on the main content area — ties interior pages to */
+/* the operating-console framing. Derived from --foreground so it adapts to */
+/* light (ink on paper) and dark (faint cream on near-black) modes. */
+#main {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: 0 0;
+}
+
 code {
   font-family: "IBM Plex Mono", Monaco, monospace;
 }

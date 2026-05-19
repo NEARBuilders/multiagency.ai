@@ -1,6 +1,6 @@
 # Deploying Your Agency
 
-Walks a fork operator from cloned repo to deployed, configured agency dashboard.
+Walks an agency operator from initialized scaffold to deployed, configured agency dashboard.
 
 For development workflow (`bun run dev`, hot-reload, etc.), see [README.md](./README.md).
 For the canonical operator manual (day-to-day operations, advanced configuration, troubleshooting), see [docs.multiagency.ai](https://docs.multiagency.ai) (planned).
@@ -16,22 +16,25 @@ For the canonical operator manual (day-to-day operations, advanced configuration
 
 ### 1. Configure your DAO account
 
-Set the `AGENCY_DAO_ACCOUNT` environment variable to your Sputnik DAO contract before deploying:
+Override the per-network default for your target network before deploying:
 
 ```bash
-AGENCY_DAO_ACCOUNT=<your-dao>.sputnik-dao.near
+AGENCY_ORG_ACCOUNT_MAINNET=<your-dao>.sputnik-dao.near
+# or, for testnet:
+NEAR_NETWORK=testnet
+AGENCY_ORG_ACCOUNT_TESTNET=<your-dao>.sputnikv2.testnet
 ```
 
-Add this to your deployment environment (hosting provider's env-var settings, `.env` file, etc.) before running `bos publish --deploy`.
+Add to your deployment environment (hosting provider's env-var settings, `.env` file, etc.) before running `bos publish --deploy`. `NEAR_NETWORK` picks which per-network var the runtime fallback uses; mainnet is the default when unset.
 
-If missing, the dashboard ships pointed at `PLACEHOLDER.sputnik-dao.near` (a non-routable placeholder). Admin surfaces stay locked until you repoint — see [Recover from missing env var](#recover-from-missing-env-var) below.
+If none are set, the dashboard renders against `multiagency.sputnik-dao.near` (the maintainer's DAO) and shows live data immediately. To take over the deployment as your own agency, configure after deploy — see [Take over a fresh deployment](#3-take-over-a-fresh-deployment) below.
 
 Optional notification channels for new-application submissions (`/apply`, `/register`, `/contact`) — each no-ops if unset:
 
 ```bash
 APPLICATIONS_WEBHOOK_URL=  # Discord/Slack/Zapier incoming webhook
 RESEND_API_KEY=            # Resend API token
-NOTIFY_FROM_EMAIL=         # sender on a Resend-verified domain; recipient is agency_settings.contactEmail
+NOTIFY_FROM_EMAIL=         # sender on a Resend-verified domain; recipient is the hardcoded `HARDCODED_CONTACT_EMAIL` in `api/src/lib/settings-defaults.ts`
 ```
 
 ### 2. Deploy
@@ -44,35 +47,34 @@ bos publish --deploy
 
 Verify: visit the deployed URL, sign in with NEAR (using an account that's Admin on your DAO), confirm the admin navigation appears in the header.
 
-### 3. Recover from missing env var
+#### Deployment notes
 
-When the `AGENCY_DAO_ACCOUNT` env var wasn't set at deploy time, the dashboard ships pointed at the placeholder DAO. Three recovery paths:
+**Single-network agencies must override both env vars (or pin).** If you operate on a single network and leave `NEAR_NETWORK` unset (free mode), set both `AGENCY_ORG_ACCOUNT_MAINNET` and `AGENCY_ORG_ACCOUNT_TESTNET` to your DAO — or duplicates of it. Otherwise, visitors toggling to the network you don't operate on observe the maintainer's testnet/mainnet DAO. The simpler pattern: set `NEAR_NETWORK=mainnet` (or `=testnet`) to pin the dashboard to your single network, hiding the toggle entirely.
 
-- **Bootstrap claim flow (recommended)** — sign in with a NEAR account that's Admin on your destination DAO. Because `agency_settings.daoAccountId` still equals the placeholder, the `_authenticated/_configured.tsx` layout redirects all admin routes to `/settings`, which renders a "Set up your worksite" affordance. Submit your DAO account ID (and admin role name override if your DAO doesn't use `Admin`). The handler verifies you're admin on the destination DAO via `userInRole` (`get_policy` over NEAR RPC) before writing the row. After claim, normal admin gating applies and the affordance disappears; further calls reject with BAD_REQUEST.
-- **Redeploy with the env var set** — clean state; useful when you can re-trigger deployment with the right env injected.
-- **Direct DB edit** — `UPDATE agency_settings SET dao_account_id = '<your-dao>.sputnik-dao.near' WHERE id = 'default';` Last-resort emergency option when neither claim flow nor redeploy is available.
+**CDN/edge cache.** The dashboard serves per-visitor data based on the `agency_view_network` cookie. If your deployment is behind a CDN (Cloudflare, Fastly, Vercel Edge, etc.), configure it to either (a) not cache `/api/*` responses, or (b) include `Cookie` in the cache key. Without this, visitors with different cookies may receive each other's cached responses — silently breaking multi-network. The application doesn't set `Cache-Control` or `Vary: Cookie` itself (the oRPC adapter doesn't expose a response-headers hook from the plugin); this is an edge-layer responsibility. Railway origin without a CDN in front is unaffected.
+
+### 3. Take over a fresh deployment
+
+A fresh deploy renders against `multiagency.sputnik-dao.near` and shows live data immediately. To make the deployment your own agency, set `AGENCY_ORG_ACCOUNT_MAINNET=your-dao.sputnik-dao.near` (or `_TESTNET` with `NEAR_NETWORK=testnet`) in your deploy environment and redeploy. The runtime fallback resolves to your DAO on every request. No DB row is created at boot.
 
 ## Configure identity
 
-Sign in as a NEAR account that's Admin in your DAO. Visit `/settings`.
+**Brand identity is hardcoded.** `name`, `headline`, `tagline`, and `contactEmail` are maintainer-branded invariants in `api/src/lib/settings-defaults.ts` — env vars do NOT override them. Agencies that need to rebrand edit those constants directly.
 
-Required:
-- **Agency name** — replaces "MultiAgency" placeholder on the landing
-- **DAO account** — should already be set from `AGENCY_DAO_ACCOUNT` env
+**Operational identity is env-overridable.** Set these in your hosting provider; each resolves per request, so `.env` edits take effect on the next API call after a restart:
 
-Recommended:
-- **Headline** — big poster line under the agency wordmark (default: "Open Books · Open Source · Open Doors")
-- **Tagline** — short descriptor used as the browser tab / share title; not displayed on the landing (default: "The future of work is near…")
-- **Contact email** — powers the `/contact` page's mailto CTA (default: "multiagentic@gmail.com")
-- **Website URL** — your standalone marketing site if you have one
-- **Docs URL** — your external docs site (appears as a card in the landing's Docs section)
-- **NEARN sponsor slug** — enables "unlinked bounties" surfacing in the Manage Projects section on `/work`
+- `AGENCY_WEBSITE_URL` — your standalone marketing site (stored; not currently rendered in v1)
+- `AGENCY_DOCS_URL` — your external docs site (renders as a `docs site →` link)
+- `AGENCY_DESCRIPTION` — long-form description (rendered under the headline on the landing when set; also surfaced as the `<meta name="description">` for search / social previews)
+- `AGENCY_NEARN_ACCOUNT` — NEARN sponsor slug; enables unlinked-bounties surfacing on `/work`
 
-Optional (advanced):
-- **Admin / Approver / Requestor role-name overrides** — only needed if your DAO uses non-Trezu role names (e.g., Sputnik's `default_policy()` uses `all`/`council`)
-- **Description, metadata** — long-form fields for internal use
+**DAO role-name overrides.** If your DAO uses non-standard role names, override:
 
-Save. The landing page reflects changes on next visit (5-minute query stale time).
+- `AGENCY_ADMIN_ROLE` (default `Admin`)
+- `AGENCY_APPROVER_ROLE` (default `Approver`)
+- `AGENCY_REQUESTOR_ROLE` (default `Requestor`)
+
+Blank values fall through to defaults; non-blank wins. See `api/src/lib/settings-defaults.ts` for the resolver. Multi-tenant per-user settings is v2.
 
 ## After setup — operating surfaces
 
@@ -84,9 +86,9 @@ Admin surfaces are sections embedded in the public routes — they appear once y
 |---|---|
 | `/work` | Public projects directory; operators get an embedded Manage Projects section — create/edit projects, link to NEARN bounties, surface unlinked bounties |
 | `/admin/projects/$slug` | Per-project budget rollup, contributors, NEARN snapshot |
+| `/admin/settings` | Admin-only configuration of operational identity: NEARN account, website/docs URLs, description, contact email. Rows are keyed by `orgAccountId` (the active DAO is read-only here — env-driven; change by editing `AGENCY_ORG_ACCOUNT_MAINNET\|TESTNET` and restarting). Brand identity (name/headline/tagline) and role names stay env-only / hardcoded — not editable here. |
 | `/team` | DAO roles, members, and permissions (read from chain); admins get embedded Contributors (vendor records — onboarding status, payment terms) and Applications review (interest captures from `/apply` + `/register` + `/contact`) sections |
-| `/treasury` | Treasury balances and recent activity; operators get an embedded Allocations section — allocate treasury into project budgets, transfer between projects, agency audit log |
-| `/payouts` | DAO proposal / payout history; operators get an embedded Billings Audit section (record payments tied to Sputnik DAO proposals) and a proposals map |
+| `/treasury` | Treasury balances and DAO proposal / payout history (`payouts` tab); operators get embedded Budgets, Recent activity, Proposals map, and Billings Audit tabs — budget treasury into projects, record payments tied to Sputnik DAO proposals, agency audit log |
 
 Detailed playbooks for each surface live at [docs.multiagency.ai](https://docs.multiagency.ai) (planned).
 
@@ -102,26 +104,26 @@ When a migration history is squashed (`api/src/db/migrations/` rewritten), the p
    DROP SCHEMA public CASCADE;
    CREATE SCHEMA public;
    ```
-4. `bos publish` — registry cutover; new bundles activate; the API plugin's `initialize` runs the migrator against the empty DB and seeds `agency_settings` from `AGENCY_DAO_ACCOUNT`
+4. `bos publish` — registry cutover; new bundles activate; the API plugin's `initialize` runs the migrator against the empty DB. Operational identity (NEARN account, urls, description, contact email) reads the `agency.settings` row (keyed by `orgAccountId`) when present, else falls through to env / hardcoded — so an empty DB renders correctly with no manual seed.
 5. Wait ~100s for propagation; smoke-test the cold-visitor + operator flows
 
 The wipe step in (3) drops both schemas because drizzle-kit (local dev) tracks in `drizzle.__drizzle_migrations` and the runtime migrator tracks in the same location — wiping public alone leaves stale hashes.
 
 ## Customizing visual identity
 
-Beyond `/settings`, fork-owned static assets:
+Beyond env vars, agency-owned static assets:
 
 - `ui/public/manifest.json` — PWA manifest (browser tab name, install prompt)
 - `ui/public/icon.svg`, `ui/public/favicon.ico`, etc. — branding assets
 - `ui/public/skills/*.md` — skill files served at `/skills/*.md` for visitor reference (linked from landing's Docs section)
 
-Replace these files in your fork to match your brand. Repository-tracked; no settings UI for these.
+Replace these files in your deployment to match your brand. Repository-tracked; no settings UI for these.
 
 ## Troubleshooting
 
 **Admin nav doesn't appear after sign-in.**
 You're signed in but not admin on the configured DAO. Verify:
-1. `agency_settings.dao_account_id` matches your DAO
+1. `AGENCY_ORG_ACCOUNT_MAINNET` (or `_TESTNET` with `NEAR_NETWORK=testnet`) env var points at your DAO
 2. Your NEAR account is in the Admin role on that DAO's `get_policy`
 
 **`/work` shows no projects.**

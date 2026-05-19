@@ -5,7 +5,7 @@ description: End-to-end contributor onboarding flow for MultiAgency — Apply �
 
 # Contributors
 
-> **Not legal or tax advice.** These pages describe how MultiAgency LLC is structured and operates — one working example, not a prescription. Entity types, tax treatment, and worker-classification rules vary by jurisdiction and change over time. Before forking this model, get qualified legal and tax counsel in the jurisdiction where your agency and contributors operate. This is an early draft, published to gather feedback — expect it to change.
+> **Not legal or tax advice.** These pages describe how MultiAgency LLC is structured and operates — one working example, not a prescription. Entity types, tax treatment, and worker-classification rules vary by jurisdiction and change over time. Before adapting this model, get qualified legal and tax counsel in the jurisdiction where your agency and contributors operate. This is an early draft, published to gather feedback — expect it to change.
 
 ## The flow at a glance
 
@@ -60,7 +60,7 @@ When a deliverable is accepted, the admin records a billing in the dashboard. Th
 Two guardrails:
 
 1. **Onboarding warning at billing time.** When an admin records a billing for a contributor whose status is not `complete`, the dashboard surfaces a warning at the create form: *"Contributor onboarding not complete. Confirm signed services agreement + tax form received before recording a payout."*
-2. **Audit log on allocations.** Every treasury allocation change records the actor's NEAR account and a timestamp — a clear record of who authorized each payment and when.
+2. **Audit log on budgets.** Every treasury budget change records the actor's NEAR account and a timestamp — a clear record of who authorized each payment and when.
 
 ## Related
 

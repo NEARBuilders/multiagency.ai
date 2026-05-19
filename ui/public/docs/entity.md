@@ -1,11 +1,11 @@
 ---
 name: entity
-description: What MultiAgency LLC is, what it owns, and how the legal entity relates to the on-chain treasury and the contributor network. Read first when onboarding a new admin or advising a fork.
+description: What MultiAgency LLC is, what it owns, and how the legal entity relates to the on-chain treasury and the contributor network. Read first when onboarding a new admin or advising a new agency.
 ---
 
 # Entity
 
-> **Not legal or tax advice.** These pages describe how MultiAgency LLC is structured and operates — one working example, not a prescription. Entity types, tax treatment, and worker-classification rules vary by jurisdiction and change over time. Before forking this model, get qualified legal and tax counsel in the jurisdiction where your agency and contributors operate. This is an early draft, published to gather feedback — expect it to change.
+> **Not legal or tax advice.** These pages describe how MultiAgency LLC is structured and operates — one working example, not a prescription. Entity types, tax treatment, and worker-classification rules vary by jurisdiction and change over time. Before adapting this model, get qualified legal and tax counsel in the jurisdiction where your agency and contributors operate. This is an early draft, published to gather feedback — expect it to change.
 
 ## What MultiAgency LLC is
 
@@ -41,7 +41,7 @@ Trezu is the UI over the Sputnik DAO. NEARN is the inbound channel for contribut
 
 ## What this model does not handle
 
-This is a working example, not a turnkey compliance system. Gaps a fork closes on its own:
+This is a working example, not a turnkey compliance system. Gaps a new agency closes on its own:
 
 - **Non-US tax.** The W-9 / W-8BEN / 1099-NEC flow across these pages is US practice; other jurisdictions differ.
 - **Money transmission.** Paying in NEAR-network tokens can raise money-transmitter and tax-characterization questions this model doesn't address.
@@ -50,7 +50,7 @@ This is a working example, not a turnkey compliance system. Gaps a fork closes o
 ## Today vs. shaped-into
 
 - **Today:** one LLC, one DAO, one admin/approver. Single-tenant.
-- **Shaped into:** a model that other agencies can fork — same LLC pattern, same dashboard, their own DAO and contributors.
+- **Shaped into:** a model that other agencies can adopt — same LLC pattern, same dashboard, their own DAO and contributors.
 
 This page describes the current state; the replication path is covered separately.
 

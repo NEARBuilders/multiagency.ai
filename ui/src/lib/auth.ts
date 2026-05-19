@@ -30,11 +30,29 @@ function getAccountId(config?: Partial<ClientRuntimeConfig>) {
   return readRuntimeConfig(config)?.account ?? "every.near";
 }
 
-function getNetworkId(config?: Partial<ClientRuntimeConfig>): "mainnet" | "testnet" {
+export function getNetwork(config?: Partial<ClientRuntimeConfig>): "mainnet" | "testnet" {
+  if (typeof window !== "undefined") {
+    // URL is canonical; localStorage is next-session memory.
+    const fromUrl = new URLSearchParams(window.location.search).get("network");
+    if (fromUrl === "mainnet" || fromUrl === "testnet") return fromUrl;
+    const cached = window.localStorage.getItem("agency_network");
+    if (cached === "mainnet" || cached === "testnet") return cached;
+  }
   return (
     readRuntimeConfig(config)?.networkId ??
     (getAccountId(config).endsWith(".testnet") ? "testnet" : "mainnet")
   );
+}
+
+export async function setNetwork(network: "mainnet" | "testnet"): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (getNetwork() === network) return;
+  window.localStorage.setItem("agency_network", network);
+  // URL is the authoritative source for the active network. Full reload so SSR
+  // routes (loaders) re-fetch with the new network on the new HTML shell.
+  const url = new URL(window.location.href);
+  url.searchParams.set("network", network);
+  window.location.href = url.toString();
 }
 
 function getHostUrl(config?: Partial<ClientRuntimeConfig>) {
@@ -56,7 +74,7 @@ function getCspNonce(config?: Partial<ClientRuntimeConfig>) {
 export function createAuthClient(config?: Partial<ClientRuntimeConfig>) {
   const nearAuthConfig = {
     recipient: getAccountId(config),
-    networkId: getNetworkId(config),
+    networkId: getNetwork(config),
     cspNonce: getCspNonce(config),
   };
 

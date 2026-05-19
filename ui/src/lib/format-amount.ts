@@ -24,6 +24,7 @@ const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number }> = {
   "cfi.consumer-fi.near": { symbol: "CFI", decimals: 18 },
   "token.publicailab.near": { symbol: "PUBLIC", decimals: 18 },
   "token.rhealab.near": { symbol: "RHEA", decimals: 18 },
+  "wrap.testnet": { symbol: "wNEAR", decimals: 24 },
 };
 
 const withThousandsSeparator = (digits: string): string =>
@@ -53,6 +54,10 @@ export function formatTokenAmount(amount: string, tokenId: string): string {
   } catch {
     return `${amount} ${tokenId}`;
   }
+}
+
+export function tokenSymbol(tokenId: string): string {
+  return KNOWN_TOKENS[tokenId]?.symbol ?? tokenId;
 }
 
 export function parseDecimalToBase(decimal: string, decimals: number): string {

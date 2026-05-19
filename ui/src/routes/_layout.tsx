@@ -15,6 +15,9 @@ export const Route = createFileRoute("/_layout")({
         : Promise.resolve(),
     ]);
   },
+  head: () => ({
+    meta: [{ name: "theme-color", content: "#ffff33" }],
+  }),
   component: Layout,
   notFoundComponent: LayoutNotFound,
   errorComponent: LayoutError,

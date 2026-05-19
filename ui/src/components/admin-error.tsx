@@ -20,7 +20,7 @@ export function AdminError({ error }: { error: unknown }) {
         <Badge variant="outline">{isAccess ? "access denied" : "could not load"}</Badge>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           {isAccess
-            ? "Admin access requires Admin or Approver role on the agency DAO. Your NEAR account is not authorized."
+            ? "Your NEAR account isn't authorized for this surface."
             : "We couldn't load this data. Try again, or check the API logs if this keeps happening."}
         </p>
         {!isAccess && message && (

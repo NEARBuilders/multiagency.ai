@@ -1,30 +1,39 @@
-import { useQuery } from "@tanstack/react-query";
+import { type UseQueryResult, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Card, CardContent, Empty, EmptyTitle, Skeleton } from "@/components";
+import { useState } from "react";
+import {
+  Badge,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Empty,
+  EmptyTitle,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components";
 import { ApplicationsAdminSection } from "@/components/applications-admin-section";
 import { ContributorsAdminSection } from "@/components/contributors-admin-section";
-import { UnclaimedState } from "@/components/unclaimed-state";
 import { useMeRoles } from "@/hooks/use-me-roles";
 import { useApiClient } from "@/lib/api";
-import { publicSettingsQueryOptions, teamListQueryOptions } from "@/lib/queries";
+import { teamListQueryOptions } from "@/lib/queries";
 
 export const Route = createFileRoute("/_layout/team")({
   head: () => ({
     meta: [{ title: "Team" }, { name: "description", content: "Roles defined on the agency DAO." }],
   }),
   loader: async ({ context }) => {
-    const settings = await context.queryClient
-      .ensureQueryData(publicSettingsQueryOptions(context.apiClient))
+    const team = await context.queryClient
+      .ensureQueryData(teamListQueryOptions(context.apiClient))
       .catch(() => null);
 
-    let team = null;
-    if (settings && !settings.isPlaceholder) {
-      team = await context.queryClient
-        .ensureQueryData(teamListQueryOptions(context.apiClient))
-        .catch(() => null);
-    }
-
-    return { settings, team };
+    return { team };
   },
   component: Team,
 });
@@ -40,30 +49,18 @@ function Team() {
   const loaderData = Route.useLoaderData();
   const apiClient = useApiClient();
   const { isOperator, isLoaded } = useMeRoles();
-
-  const settingsQuery = useQuery({
-    ...publicSettingsQueryOptions(apiClient),
-    initialData: loaderData.settings ?? undefined,
-  });
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
 
   const teamQuery = useQuery({
     ...teamListQueryOptions(apiClient),
     initialData: loaderData.team ?? undefined,
   });
 
-  if (settingsQuery.data?.isPlaceholder) {
-    return (
-      <UnclaimedState title="Team">
-        Once configured, roles and members are pulled live from the DAO contract.
-      </UnclaimedState>
-    );
-  }
-
   return (
     <div className="space-y-12 pb-12 animate-fade-in">
       <header className="space-y-2">
         <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-          agency · roles
+          agency · team
         </div>
         <h1 className="font-display text-4xl sm:text-6xl font-black uppercase leading-none tracking-tight">
           Team
@@ -73,65 +70,77 @@ function Team() {
         </p>
       </header>
 
-      {teamQuery.isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <RoleCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : teamQuery.isError ? (
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-          could not load — try again
-        </p>
-      ) : teamQuery.data && teamQuery.data.roles.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {teamQuery.data.roles.map((role) => (
-            <RoleCard key={role.name} role={role} />
-          ))}
-        </div>
-      ) : (
-        <Empty className="border-2 border-dashed border-border/40">
-          <EmptyTitle className="font-display text-2xl uppercase tracking-tight text-muted-foreground">
-            no roles defined
-          </EmptyTitle>
-        </Empty>
-      )}
-
-      {isLoaded && isOperator && (
-        <>
-          <section className="space-y-6">
-            <div className="space-y-2">
-              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-                operator · contributors
-              </div>
-              <h2 className="font-display text-3xl sm:text-4xl font-black uppercase leading-none tracking-tight">
-                Manage Contributors
-              </h2>
-              <p className="text-sm text-muted-foreground max-w-2xl">
-                Off-chain contributor records. These may or may not yet be in a DAO role on chain.
-              </p>
-            </div>
+      {isLoaded && isOperator ? (
+        <Tabs defaultValue="roles">
+          <TabsList variant="line" className="font-mono text-[11px] uppercase tracking-[0.22em]">
+            <TabsTrigger value="roles">roles</TabsTrigger>
+            <TabsTrigger value="contributors">contributors</TabsTrigger>
+            <TabsTrigger value="applications">applications</TabsTrigger>
+          </TabsList>
+          <TabsContent value="roles" className="mt-6">
+            <PublicRoles teamQuery={teamQuery} onSelectMember={setSelectedMember} />
+          </TabsContent>
+          <TabsContent value="contributors" className="mt-6">
             <ContributorsAdminSection />
-          </section>
-
-          <section className="space-y-6">
-            <div className="space-y-2">
-              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-                operator · applications
-              </div>
-              <h2 className="font-display text-3xl sm:text-4xl font-black uppercase leading-none tracking-tight">
-                Applications Inbox
-              </h2>
-              <p className="text-sm text-muted-foreground max-w-2xl">
-                Received interest submissions from `/apply`, `/register`, and `/contact`. Filter by
-                kind.
-              </p>
-            </div>
+          </TabsContent>
+          <TabsContent value="applications" className="mt-6">
             <ApplicationsAdminSection />
-          </section>
-        </>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <PublicRoles teamQuery={teamQuery} onSelectMember={setSelectedMember} />
       )}
+      <MemberDetailDialog
+        accountId={selectedMember}
+        roles={teamQuery.data?.roles ?? []}
+        onOpenChange={(open) => {
+          if (!open) setSelectedMember(null);
+        }}
+      />
     </div>
+  );
+}
+
+type TeamQuery = UseQueryResult<{ roles: Role[] }>;
+
+function PublicRoles({
+  teamQuery,
+  onSelectMember,
+}: {
+  teamQuery: TeamQuery;
+  onSelectMember: (account: string) => void;
+}) {
+  if (teamQuery.isLoading) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <RoleCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+  if (teamQuery.isError) {
+    return (
+      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+        could not load — try again
+      </p>
+    );
+  }
+  if (teamQuery.data && teamQuery.data.roles.length > 0) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {teamQuery.data.roles.map((role) => (
+          <RoleCard key={role.name} role={role} onSelectMember={onSelectMember} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <Empty className="border-2 border-dashed border-border/40">
+      <EmptyTitle className="font-display text-2xl uppercase tracking-tight text-muted-foreground">
+        no roles defined
+      </EmptyTitle>
+    </Empty>
   );
 }
 
@@ -158,7 +167,13 @@ function RoleCardSkeleton() {
   );
 }
 
-function RoleCard({ role }: { role: Role }) {
+function RoleCard({
+  role,
+  onSelectMember,
+}: {
+  role: Role;
+  onSelectMember: (account: string) => void;
+}) {
   return (
     <Card className="flex flex-col">
       <CardContent className="p-4 flex-1 flex flex-col gap-3">
@@ -181,9 +196,15 @@ function RoleCard({ role }: { role: Role }) {
         ) : (
           <div className="grid gap-1">
             {role.members.map((acct) => (
-              <div key={acct} className="font-mono text-xs break-all">
+              <button
+                key={acct}
+                type="button"
+                onClick={() => onSelectMember(acct)}
+                aria-label={`Open ${acct} details`}
+                className="font-mono text-xs truncate text-left hover:text-foreground/70 focus:outline-none focus-visible:underline cursor-pointer"
+              >
                 {acct}
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -194,17 +215,123 @@ function RoleCard({ role }: { role: Role }) {
             </div>
             <div className="flex flex-wrap gap-1">
               {role.permissions.map((p) => (
-                <span
+                <Badge
                   key={p}
-                  className="font-mono text-[10px] uppercase tracking-wide border border-foreground/40 px-1.5 py-0.5 text-muted-foreground"
+                  variant="outline"
+                  className="font-mono text-[10px] uppercase tracking-wide border-foreground/40 text-muted-foreground"
                 >
                   {p}
-                </span>
+                </Badge>
               ))}
             </div>
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function MemberDetailDialog({
+  accountId,
+  roles,
+  onOpenChange,
+}: {
+  accountId: string | null;
+  roles: Role[];
+  onOpenChange: (open: boolean) => void;
+}) {
+  if (!accountId) {
+    return (
+      <Dialog open={false} onOpenChange={onOpenChange}>
+        <DialogContent />
+      </Dialog>
+    );
+  }
+  const heldRoles = roles.filter((r) => !r.isEveryone && r.members.includes(accountId));
+  const openRoles = roles.filter((r) => r.isEveryone);
+  const permissions = Array.from(new Set(heldRoles.flatMap((r) => r.permissions))).sort();
+  return (
+    <Dialog open={!!accountId} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em]">
+            <span className="text-muted-foreground">member</span>
+            <Badge variant="outline">
+              {heldRoles.length} role{heldRoles.length === 1 ? "" : "s"}
+            </Badge>
+          </div>
+          <DialogTitle className="font-display text-2xl uppercase tracking-tight font-extrabold leading-tight break-all">
+            {accountId}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            DAO roles and permissions for {accountId}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              roles held
+            </div>
+            {heldRoles.length === 0 ? (
+              <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+                no explicit roles
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1">
+                {heldRoles.map((r) => (
+                  <Badge
+                    key={r.name}
+                    variant="outline"
+                    className="font-mono text-[10px] uppercase tracking-wide"
+                  >
+                    {r.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+          {openRoles.length > 0 && (
+            <div className="space-y-2">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                open roles
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {openRoles.map((r) => (
+                  <Badge
+                    key={r.name}
+                    variant="outline"
+                    className="font-mono text-[10px] uppercase tracking-wide border-foreground/30 text-muted-foreground"
+                  >
+                    {r.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="space-y-2">
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              permissions
+            </div>
+            {permissions.length === 0 ? (
+              <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+                none — read-only
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1">
+                {permissions.map((p) => (
+                  <Badge
+                    key={p}
+                    variant="outline"
+                    className="font-mono text-[10px] uppercase tracking-wide border-foreground/40 text-muted-foreground"
+                  >
+                    {p}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

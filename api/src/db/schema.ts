@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { index, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgSchema,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 export const agency = pgSchema("agency");
 
@@ -28,46 +37,63 @@ export const applications = agency.table(
 export type Application = typeof applications.$inferSelect;
 export type NewApplication = typeof applications.$inferInsert;
 
-export const projects = agency.table(
-  "projects",
+// Listings keyed to upstream project id; NEARN-sourced rows are a lazy-refresh cache from nearn.io.
+export const listings = agency.table(
+  "listings",
   {
     id: text("id").primaryKey(),
-    ownerId: text("owner_id").notNull(),
-    organizationId: text("organization_id").notNull(),
-    slug: text("slug").notNull(),
-    title: text("title").notNull(),
+    projectId: text("project_id").notNull(),
+    source: text("source", { enum: ["nearn", "internal"] }).notNull(),
+    externalId: text("external_id"),
+    title: text("title"),
     description: text("description"),
-    nearnListingId: text("nearn_listing_id"),
-    status: text("status", { enum: ["active", "paused", "archived"] })
-      .notNull()
-      .default("active"),
-    visibility: text("visibility", { enum: ["public", "private"] })
-      .notNull()
-      .default("private"),
+    type: text("type"),
+    status: text("status"),
+    token: text("token"),
+    rewardAmount: text("reward_amount"),
+    deadline: timestamp("deadline", { withTimezone: false }),
+    isPublished: boolean("is_published"),
+    isArchived: boolean("is_archived"),
+    isWinnersAnnounced: boolean("is_winners_announced"),
+    sponsorName: text("sponsor_name"),
+    sponsorSlug: text("sponsor_slug"),
+    sponsorLogo: text("sponsor_logo"),
+    sponsorVerified: boolean("sponsor_verified"),
+    syncedAt: timestamp("synced_at", { withTimezone: false }),
     createdAt: timestamp("created_at", { withTimezone: false }).notNull().default(sql`now()`),
     updatedAt: timestamp("updated_at", { withTimezone: false }).notNull().default(sql`now()`),
   },
   (t) => ({
-    ownerSlug: uniqueIndex("projects_owner_slug").on(t.ownerId, t.slug),
+    projectIdx: index("listings_project_id").on(t.projectId),
+    projectSourceUnique: uniqueIndex("listings_project_source").on(t.projectId, t.source),
+    sourceExternalIdUnique: uniqueIndex("listings_source_external_id")
+      .on(t.source, t.externalId)
+      .where(sql`${t.externalId} IS NOT NULL`),
   }),
 );
 
-export type Project = typeof projects.$inferSelect;
-export type NewProject = typeof projects.$inferInsert;
+export type Listing = typeof listings.$inferSelect;
+export type NewListing = typeof listings.$inferInsert;
 
-export const contributors = agency.table("contributors", {
-  id: text("id").primaryKey(),
-  nearAccountId: text("near_account_id"),
-  name: text("name").notNull(),
-  email: text("email"),
-  onboardingStatus: text("onboarding_status", {
-    enum: ["pending", "complete", "expired"],
-  })
-    .notNull()
-    .default("pending"),
-  createdAt: timestamp("created_at", { withTimezone: false }).notNull().default(sql`now()`),
-  updatedAt: timestamp("updated_at", { withTimezone: false }).notNull().default(sql`now()`),
-});
+export const contributors = agency.table(
+  "contributors",
+  {
+    id: text("id").primaryKey(),
+    nearAccountId: text("near_account_id"),
+    name: text("name").notNull(),
+    email: text("email"),
+    onboardingStatus: text("onboarding_status", {
+      enum: ["pending", "complete", "expired"],
+    })
+      .notNull()
+      .default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: false }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: false }).notNull().default(sql`now()`),
+  },
+  (t) => ({
+    nearAccountIdx: index("contributors_near_account_id").on(t.nearAccountId),
+  }),
+);
 
 export type Contributor = typeof contributors.$inferSelect;
 export type NewContributor = typeof contributors.$inferInsert;
@@ -75,9 +101,7 @@ export type NewContributor = typeof contributors.$inferInsert;
 export const projectContributors = agency.table(
   "project_contributors",
   {
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull(),
     contributorId: text("contributor_id")
       .notNull()
       .references(() => contributors.id, { onDelete: "cascade" }),
@@ -89,35 +113,32 @@ export const projectContributors = agency.table(
   }),
 );
 
-export const allocations = agency.table(
-  "allocations",
+export const budgets = agency.table(
+  "budgets",
   {
     id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull(),
     tokenId: text("token_id").notNull(),
     amount: text("amount").notNull(),
     note: text("note"),
     actorAccountId: text("actor_account_id").notNull(),
-    relatedAllocationId: text("related_allocation_id"),
+    relatedBudgetId: text("related_budget_id"),
     createdAt: timestamp("created_at", { withTimezone: false }).notNull().default(sql`now()`),
   },
   (t) => ({
-    cursor: index("allocations_cursor").on(t.createdAt, t.id),
+    cursor: index("budgets_cursor").on(t.createdAt, t.id),
+    projectIdx: index("budgets_project_id").on(t.projectId),
   }),
 );
 
-export type Allocation = typeof allocations.$inferSelect;
-export type NewAllocation = typeof allocations.$inferInsert;
+export type Budget = typeof budgets.$inferSelect;
+export type NewBudget = typeof budgets.$inferInsert;
 
 export const billings = agency.table(
   "billings",
   {
     id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull(),
     contributorId: text("contributor_id").references(() => contributors.id, {
       onDelete: "set null",
     }),
@@ -130,28 +151,59 @@ export const billings = agency.table(
   (t) => ({
     cursor: index("billings_cursor").on(t.createdAt, t.id),
     proposalUnique: uniqueIndex("billings_proposal_unique").on(t.proposalId),
+    projectIdx: index("billings_project_id").on(t.projectId),
   }),
 );
 
 export type Billing = typeof billings.$inferSelect;
 export type NewBilling = typeof billings.$inferInsert;
 
-export const agencySettings = agency.table("settings", {
-  id: text("id").primaryKey(),
-  daoAccountId: text("dao_account_id").notNull(),
+export const proposals = agency.table(
+  "proposals",
+  {
+    daoAccountId: text("dao_account_id").notNull(),
+    proposalId: integer("proposal_id").notNull(),
+    proposer: text("proposer").notNull(),
+    description: text("description").notNull(),
+    status: text("status", {
+      enum: ["Approved", "Rejected", "Removed", "Expired", "Moved", "Failed"],
+    }).notNull(),
+    kindType: text("kind_type", { enum: ["Transfer", "Other"] }).notNull(),
+    transferTokenId: text("transfer_token_id"),
+    transferReceiverId: text("transfer_receiver_id"),
+    transferAmount: text("transfer_amount"),
+    otherKindName: text("other_kind_name"),
+    submissionTime: text("submission_time").notNull(),
+    indexedAt: timestamp("indexed_at", { withTimezone: false }).notNull().default(sql`now()`),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.daoAccountId, t.proposalId] }),
+  }),
+);
+
+export type Proposal = typeof proposals.$inferSelect;
+export type NewProposal = typeof proposals.$inferInsert;
+
+// Per-DAO settings rows. Primary-keyed by orgAccountId (the Sputnik DAO account) — multi-tenant native:
+// each DAO gets its own row, identity is immutable. Single-tenant v1 resolves orgAccountId from env per
+// request; the row keyed by that orgAccountId carries editable operational identity. Multi-tenant v1
+// resolves orgAccountId from session/tenant context; same schema, no migration needed.
+// Brand identity (name/headline/tagline) stays hardcoded in settings-defaults.ts — not in the table.
+// Sputnik role names stay env-only — admin renaming a role they don't hold is an irreversible self-lockout.
+// Editable operational identity: nearnAccountId, websiteUrl, docsUrl, description, contactEmail.
+// orgAccountId itself is the row's immutable identity — "change DAO" is a deployment-level concern (env edit + restart).
+export const settings = agency.table("settings", {
+  orgAccountId: text("org_account_id").primaryKey(),
   nearnAccountId: text("nearn_account_id"),
-  name: text("name").notNull().default("MultiAgency"),
-  headline: text("headline").default("Open Books · Open Source · Open Doors"),
-  tagline: text("tagline").default("The future of work is near…"),
-  contactEmail: text("contact_email").default("multiagentic@gmail.com"),
   websiteUrl: text("website_url"),
   docsUrl: text("docs_url"),
   description: text("description"),
-  metadata: text("metadata"),
-  adminRoleName: text("admin_role_name").default("Admin"),
-  approverRoleName: text("approver_role_name").default("Approver"),
-  requestorRoleName: text("requestor_role_name").default("Requestor"),
+  contactEmail: text("contact_email"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: false }).notNull().default(sql`now()`),
+  updatedBy: text("updated_by").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: false }).notNull().default(sql`now()`),
 });
 
-export type AgencySettings = typeof agencySettings.$inferSelect;
+export type Settings = typeof settings.$inferSelect;
+export type NewSettings = typeof settings.$inferInsert;

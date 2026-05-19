@@ -5,7 +5,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button, Card, CardContent, Input, Spinner, Textarea } from "@/components";
-import { useMeRoles } from "@/hooks/use-me-roles";
 import { useApiClient } from "@/lib/api";
 
 export const Route = createFileRoute("/_layout/contact")({
@@ -28,7 +27,6 @@ const ERROR_CLS = "text-sm text-destructive";
 
 function Contact() {
   const apiClient = useApiClient();
-  const { isAdmin, isLoaded } = useMeRoles();
   const [submitted, setSubmitted] = useState(false);
 
   const submitMutation = useMutation({
@@ -53,7 +51,7 @@ function Contact() {
       email: "",
       message: "",
     } as ContactValues,
-    validators: { onChange: contactSchema },
+    validators: { onChange: contactSchema, onSubmit: contactSchema },
     onSubmit: async ({ value }) => {
       await submitMutation.mutateAsync(value);
     },
@@ -104,7 +102,7 @@ function Contact() {
           agency · inquire
         </div>
         <h1 className="font-display text-4xl sm:text-5xl uppercase tracking-tight font-black leading-[0.95]">
-          Tell us what you need.
+          Tell us what you need
         </h1>
       </header>
 
@@ -116,54 +114,73 @@ function Contact() {
 
           <form
             className="space-y-4"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
               e.stopPropagation();
-              form.handleSubmit();
+              await form.validateAllFields("submit");
+              if (form.state.canSubmit) {
+                form.handleSubmit();
+              }
             }}
           >
             <form.Field name="name">
-              {(field) => (
-                <div className="space-y-2">
-                  <label htmlFor={field.name} className={LABEL_CLS}>
-                    name
-                  </label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="your name"
-                    disabled={isPending}
-                  />
-                  {field.state.meta.errors[0] && (
-                    <p className={ERROR_CLS}>{fieldErrorMessage(field.state.meta.errors[0])}</p>
-                  )}
-                </div>
-              )}
+              {(field) => {
+                const err = field.state.meta.errors[0];
+                const errId = `${field.name}-error`;
+                return (
+                  <div className="space-y-2">
+                    <label htmlFor={field.name} className={LABEL_CLS}>
+                      name
+                    </label>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      placeholder="your name"
+                      disabled={isPending}
+                      aria-invalid={err ? true : undefined}
+                      aria-describedby={err ? errId : undefined}
+                    />
+                    {err && (
+                      <p id={errId} aria-live="polite" className={ERROR_CLS}>
+                        {fieldErrorMessage(err)}
+                      </p>
+                    )}
+                  </div>
+                );
+              }}
             </form.Field>
             <form.Field name="email">
-              {(field) => (
-                <div className="space-y-2">
-                  <label htmlFor={field.name} className={LABEL_CLS}>
-                    email
-                  </label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    type="email"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="email@example.com"
-                    disabled={isPending}
-                  />
-                  {field.state.meta.errors[0] && (
-                    <p className={ERROR_CLS}>{fieldErrorMessage(field.state.meta.errors[0])}</p>
-                  )}
-                </div>
-              )}
+              {(field) => {
+                const err = field.state.meta.errors[0];
+                const errId = `${field.name}-error`;
+                return (
+                  <div className="space-y-2">
+                    <label htmlFor={field.name} className={LABEL_CLS}>
+                      email
+                    </label>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      type="email"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      placeholder="email@example.com"
+                      disabled={isPending}
+                      aria-invalid={err ? true : undefined}
+                      aria-describedby={err ? errId : undefined}
+                    />
+                    {err && (
+                      <p id={errId} aria-live="polite" className={ERROR_CLS}>
+                        {fieldErrorMessage(err)}
+                      </p>
+                    )}
+                  </div>
+                );
+              }}
             </form.Field>
             <form.Field name="message">
               {(field) => (
@@ -196,18 +213,6 @@ function Contact() {
           </form>
         </CardContent>
       </Card>
-
-      {isLoaded && isAdmin && (
-        <div className="text-center">
-          <Link
-            to="/settings"
-            hash="contact"
-            className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground hover:text-foreground"
-          >
-            edit contact →
-          </Link>
-        </div>
-      )}
     </div>
   );
 }

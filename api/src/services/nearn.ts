@@ -4,6 +4,18 @@ const NEARN_BASE_URL = "https://nearn.io";
 const LISTING_TTL_MS = 60_000;
 const SPONSOR_LISTINGS_TTL_MS = 60_000;
 
+export class NearnNotFoundError extends Error {
+  constructor(readonly slug: string) {
+    super(`NEARN listing not found: ${slug}`);
+    this.name = "NearnNotFoundError";
+  }
+}
+
+// NEARN mainnet-only; testnet orgAccounts → unavailable.
+export function isNearnAvailable(orgAccountId: string): boolean {
+  return !orgAccountId.endsWith(".testnet");
+}
+
 export interface NearnListing {
   slug: string;
   title: string | null;
@@ -52,7 +64,7 @@ export async function getNearnListing(slug: string): Promise<NearnListing> {
     { method: "GET", headers: { Accept: "application/json" } },
   );
   if (response.status === 404) {
-    throw new Error(`NEARN listing not found: ${slug}`);
+    throw new NearnNotFoundError(slug);
   }
   if (!response.ok) {
     throw new Error(`NEARN listing fetch failed: ${response.status}`);

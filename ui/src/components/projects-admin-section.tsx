@@ -22,7 +22,7 @@ import {
 } from "@/lib/queries";
 
 type ProjectStatus = "active" | "paused" | "archived";
-type Visibility = "public" | "private";
+type Visibility = "public" | "unlisted" | "private";
 
 type Project = {
   id: string;
@@ -31,6 +31,7 @@ type Project = {
   slug: string;
   title: string;
   description: string | null;
+  repository: string | null;
   nearnListingId: string | null;
   status: ProjectStatus;
   visibility: Visibility;
@@ -197,7 +198,7 @@ function formatFundingBadge(
   const remaining = BigInt(top.remaining);
   if (remaining < 0n) {
     return {
-      label: `over-allocated ${formatTokenAmount((-remaining).toString(), top.tokenId)}`,
+      label: `over-budget ${formatTokenAmount((-remaining).toString(), top.tokenId)}`,
       tone: "destructive",
     };
   }
@@ -223,6 +224,7 @@ function ProjectCreateForm({
   const [slug, setSlug] = useState(initialSlug ?? "");
   const [title, setTitle] = useState(initialTitle ?? "");
   const [description, setDescription] = useState("");
+  const [repository, setRepository] = useState("");
   const [nearnListingId, setNearnListingId] = useState(initialNearnListingId ?? "");
   const [status, setStatus] = useState<ProjectStatus>("active");
   const [vis, setVis] = useState<Visibility>("private");
@@ -233,6 +235,7 @@ function ProjectCreateForm({
         slug: slug.trim(),
         title: title.trim(),
         description: description.trim() || undefined,
+        repository: repository.trim() || undefined,
         nearnListingId: nearnListingId.trim() || undefined,
         status,
         visibility: vis,
@@ -279,6 +282,15 @@ function ProjectCreateForm({
             rows={3}
             disabled={isPending}
             className={textareaClass}
+          />
+        </Field>
+        <Field label="repository url (optional)" htmlFor="new-repository">
+          <Input
+            id="new-repository"
+            value={repository}
+            onChange={(e) => setRepository(e.target.value)}
+            placeholder="https://github.com/org/repo"
+            disabled={isPending}
           />
         </Field>
         <Field label="nearn listing slug (optional)" htmlFor="new-nearn-listing">
@@ -335,6 +347,7 @@ function ProjectEditForm({ project }: { project: Project }) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(project.title);
   const [description, setDescription] = useState(project.description ?? "");
+  const [repository, setRepository] = useState(project.repository ?? "");
   const [nearnListingId, setNearnListingId] = useState(project.nearnListingId ?? "");
   const [status, setStatus] = useState<ProjectStatus>(project.status);
   const [vis, setVis] = useState<Visibility>(project.visibility);
@@ -342,6 +355,7 @@ function ProjectEditForm({ project }: { project: Project }) {
   useEffect(() => {
     setTitle(project.title);
     setDescription(project.description ?? "");
+    setRepository(project.repository ?? "");
     setNearnListingId(project.nearnListingId ?? "");
     setStatus(project.status);
     setVis(project.visibility);
@@ -353,6 +367,7 @@ function ProjectEditForm({ project }: { project: Project }) {
         id: project.id,
         title: title.trim(),
         description: description.trim() || null,
+        repository: repository.trim() || undefined,
         nearnListingId: nearnListingId.trim() || null,
         status,
         visibility: vis,
@@ -391,6 +406,15 @@ function ProjectEditForm({ project }: { project: Project }) {
           rows={3}
           disabled={isPending}
           className={textareaClass}
+        />
+      </Field>
+      <Field label="repository url (optional)" htmlFor={`edit-repository-${project.id}`}>
+        <Input
+          id={`edit-repository-${project.id}`}
+          value={repository}
+          onChange={(e) => setRepository(e.target.value)}
+          placeholder="https://github.com/org/repo"
+          disabled={isPending}
         />
       </Field>
       <Field label="nearn listing slug" htmlFor={`edit-nearn-${project.id}`}>
@@ -661,11 +685,8 @@ function NearnSponsorBountiesPanel({
     return (
       <Card>
         <CardContent className="p-5 text-sm text-muted-foreground">
-          No NEARN sponsor configured. Set <span className="font-mono">nearnAccountId</span> on the{" "}
-          <Link to="/settings" className="underline">
-            settings page
-          </Link>{" "}
-          to surface unlinked NEARN bounties here.
+          No NEARN sponsor configured. Set <span className="font-mono">AGENCY_NEARN_ACCOUNT</span>{" "}
+          in the deploy environment to surface unlinked NEARN bounties here.
         </CardContent>
       </Card>
     );

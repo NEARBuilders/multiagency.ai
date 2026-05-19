@@ -4,7 +4,6 @@ import trezuLogo from "@/assets/brand/trezu.svg";
 import trezuSymbol from "@/assets/brand/trezu-symbol.svg";
 import { Badge, Button, Card, CardContent, Empty, EmptyTitle, Skeleton } from "@/components";
 import { ReactionDiffusionField } from "@/components/reaction-diffusion-field";
-import { UnclaimedState } from "@/components/unclaimed-state";
 import { useApiClient } from "@/lib/api";
 import { nearnSponsorUrl } from "@/lib/nearn";
 import { projectsListQueryOptions, publicSettingsQueryOptions } from "@/lib/queries";
@@ -85,18 +84,9 @@ function Landing() {
   const description = s?.description?.trim() || null;
   const contactEmail = s?.contactEmail?.trim() || null;
   const docsUrl = s?.docsUrl?.trim() || null;
-  const isPlaceholder = !!s?.isPlaceholder;
-  const treasuryUrl = s?.daoAccountId ? trezuTreasuryUrl(s.daoAccountId) : null;
+  const treasuryUrl = s?.orgAccountId ? trezuTreasuryUrl(s.orgAccountId) : null;
   const repositoryUrl = getRepoUrl();
   const sponsorUrl = s?.nearnAccountId ? nearnSponsorUrl(s.nearnAccountId) : null;
-
-  if (isPlaceholder) {
-    return (
-      <UnclaimedState title="MultiAgency">
-        Fork the template to deploy your own agency.
-      </UnclaimedState>
-    );
-  }
 
   const projects = (projectsQuery.data?.data ?? []) as LandingProject[];
   const visibleProjects = projects.slice(0, 6);

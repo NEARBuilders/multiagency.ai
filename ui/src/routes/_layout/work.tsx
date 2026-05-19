@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { type UseQueryResult, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  Badge,
   Button,
   Card,
   CardContent,
@@ -9,6 +10,10 @@ import {
   EmptyDescription,
   EmptyTitle,
   Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@/components";
 import { ProjectsAdminSection } from "@/components/projects-admin-section";
 import { useMeRoles } from "@/hooks/use-me-roles";
@@ -40,8 +45,8 @@ type ProjectListItem = {
   slug: string;
   title: string;
   status: string;
-  nearnListingId: string | null;
   nearnListing: {
+    slug: string;
     status?: string | null;
     type?: string | null;
     description?: string | null;
@@ -54,7 +59,7 @@ type ProjectListItem = {
 function WorkIndex() {
   const loaderData = Route.useLoaderData();
   const apiClient = useApiClient();
-  const { isOperator, isAdmin, isLoaded } = useMeRoles();
+  const { isOperator, isLoaded } = useMeRoles();
   const projectsQuery = useQuery({
     ...projectsListQueryOptions(apiClient),
     staleTime: 30_000,
@@ -94,90 +99,91 @@ function WorkIndex() {
         </p>
       </header>
 
-      {projectsQuery.isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <ProjectCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : projectsQuery.isError ? (
-        <div
-          role="alert"
-          className="flex items-center gap-4 font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground"
-        >
-          <span>could not load</span>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => projectsQuery.refetch()}
-            className="font-display uppercase tracking-wide"
-          >
-            try again
-          </Button>
-        </div>
-      ) : projectsQuery.data && projectsQuery.data.data.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(projectsQuery.data.data as ProjectListItem[]).map((p) => (
-            <ProjectCard key={p.id} project={p} />
-          ))}
-        </div>
+      {isLoaded && isOperator ? (
+        <Tabs defaultValue="public">
+          <TabsList variant="line" className="font-mono text-[11px] uppercase tracking-[0.22em]">
+            <TabsTrigger value="public">public</TabsTrigger>
+            <TabsTrigger value="manage">manage projects</TabsTrigger>
+          </TabsList>
+          <TabsContent value="public" className="mt-6">
+            <PublicProjects projectsQuery={projectsQuery} />
+          </TabsContent>
+          <TabsContent value="manage" className="mt-6 space-y-4">
+            <ProjectsAdminSection />
+          </TabsContent>
+        </Tabs>
       ) : (
-        <Empty className="border-2 border-dashed border-border/40">
-          <EmptyTitle className="font-display text-2xl uppercase tracking-tight text-muted-foreground">
-            no public projects yet
-          </EmptyTitle>
-          <EmptyDescription className="font-mono text-xs uppercase tracking-wide">
-            check back as the agency boots up.
-          </EmptyDescription>
-          <EmptyContent>
-            <Button asChild className="font-display uppercase tracking-wide">
-              <Link to="/apply">apply →</Link>
-            </Button>
-          </EmptyContent>
-        </Empty>
-      )}
-
-      {isLoaded && isOperator && (
-        <section className="space-y-6">
-          <div className="space-y-2">
-            <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-              operator · projects
-            </div>
-            <h2 className="font-display text-3xl sm:text-4xl font-black uppercase leading-none tracking-tight">
-              Manage Projects
-            </h2>
-            <p className="text-sm text-muted-foreground max-w-2xl">
-              Create, edit, and assign contributors to projects. Visibility and status control what
-              appears in the public list above.
-            </p>
-            {isAdmin && (
-              <div className="pt-1">
-                <Link
-                  to="/settings"
-                  hash="nearn"
-                  className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground hover:text-foreground"
-                >
-                  edit nearn config →
-                </Link>
-              </div>
-            )}
-          </div>
-          <ProjectsAdminSection />
-        </section>
+        <PublicProjects projectsQuery={projectsQuery} />
       )}
     </div>
   );
 }
 
+type ProjectsQuery = UseQueryResult<{ data: ProjectListItem[] }>;
+
+function PublicProjects({ projectsQuery }: { projectsQuery: ProjectsQuery }) {
+  if (projectsQuery.isLoading) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <ProjectCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+  if (projectsQuery.isError) {
+    return (
+      <div
+        role="alert"
+        className="flex items-center gap-4 font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground"
+      >
+        <span>could not load</span>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => projectsQuery.refetch()}
+          className="font-display uppercase tracking-wide"
+        >
+          try again
+        </Button>
+      </div>
+    );
+  }
+  if (projectsQuery.data && projectsQuery.data.data.length > 0) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {projectsQuery.data.data.map((p) => (
+          <ProjectCard key={p.id} project={p} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <Empty className="border-2 border-dashed border-border/40">
+      <EmptyTitle className="font-display text-2xl uppercase tracking-tight text-muted-foreground">
+        no public projects yet
+      </EmptyTitle>
+      <EmptyDescription className="font-mono text-xs uppercase tracking-wide">
+        check back as the agency boots up.
+      </EmptyDescription>
+      <EmptyContent>
+        <Button asChild className="font-display uppercase tracking-wide">
+          <Link to="/apply">apply →</Link>
+        </Button>
+      </EmptyContent>
+    </Empty>
+  );
+}
+
 function ProjectCard({ project }: { project: ProjectListItem }) {
   const n = project.nearnListing;
-  const nearnHref = project.nearnListingId ? nearnListingUrl(project.nearnListingId) : null;
+  const nearnHref = n?.slug ? nearnListingUrl(n.slug) : null;
   return (
     <Card className="flex flex-col border-2 border-foreground">
       <CardContent className="p-4 flex-1 flex flex-col gap-3">
-        <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        <div className="flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           <span className="truncate">@{project.slug}</span>
-          <span>{project.status}</span>
+          {n?.status ? <Badge variant="default">{n.status}</Badge> : <span>{project.status}</span>}
         </div>
         <h2 className="font-display text-xl uppercase tracking-tight font-extrabold leading-tight break-words">
           {project.title}
@@ -188,7 +194,6 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
           </p>
         )}
         <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground space-y-1">
-          {n?.status && <div>nearn · {n.status}</div>}
           {n?.type && <div>type · {n.type}</div>}
           {n?.rewardAmount !== undefined && n?.rewardAmount !== null && n?.token && (
             <div>

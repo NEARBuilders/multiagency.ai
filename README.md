@@ -9,7 +9,7 @@
 
 </div>
 
-A customizable dashboard template for on-chain agencies — DAO-shaped entities sourcing contributors, allocating treasury to projects, and billing against allocations.
+A customizable dashboard template for on-chain agencies — DAO-shaped entities sourcing contributors, budgeting treasury to projects, and billing against those budgets.
 
 Maintained by [MultiAgency](https://github.com/MultiAgency). Built on [everything.dev](https://github.com/NEARBuilders/everything-dev).
 
@@ -19,7 +19,7 @@ Built with [Tanstack Start](https://tanstack.com/start/latest/docs/framework/rea
 
 ## Status
 
-This fork is shaped as the template described above. Phase 0 cleanup removed the upstream surfaces that don't fit the agency model (organizations, admin dashboard, apps browser, registry plugin). The agency-specific modules below are wired end-to-end in this commit.
+This repo is shaped as the template described above. Phase 0 cleanup removed the upstream surfaces that don't fit the agency model (organizations, admin dashboard, apps browser, registry plugin). The agency-specific modules below are wired end-to-end in this commit.
 
 **Public surface:**
 
@@ -31,58 +31,54 @@ This fork is shaped as the template described above. Phase 0 cleanup removed the
 **Authenticated workspace:**
 
 - Home
-- Settings — identity + agency configuration (DAO account, NEARN account, name, website, description, metadata) for admins
 - Admin / Projects — list, create, edit, assign contributors
 - Admin / Contributors — list, create, edit (compliance status + docs)
-- Admin / Allocations — per-project budget rollup, allocate/deallocate, audit log
+- Admin / Budgets — per-project rollup (budgeted / allocated / committed / paid / remaining) with budget / deallocate / transfer actions, audit log
 - Admin / Billings — flat list with project / contributor filters; create new billings as project-scoped pointers to Sputnik DAO proposals (`proposalId` required, `NOT NULL UNIQUE`). Status is read live from chain per-request (seven-state Sputnik enum); no local lifecycle field, no manual status override. Per-row Trezu deep-link for the live chain view.
 - Admin / Applications — flat list with kind / status filters; review submissions from `/apply`, transition status (new → reviewing → accepted/declined). Submissions themselves are immutable
 
-Admin routes are gated server-side by a `gates` registry that checks Sputnik DAO role membership (strict `Admin` / `Approver` / `Requestor` tiers plus named compositions like `operator` for Admin OR Approver) for the signed-in NEAR account against `agency_settings.daoAccountId`. Time-series admin lists (billings, allocations, applications) are paginated cursor-style; the UI exposes a "load more" button.
+Admin routes are gated server-side by a `gates` registry that checks Sputnik DAO role membership (strict `Admin` / `Approver` / `Requestor` tiers plus named compositions like `operator` for Admin OR Approver) for the signed-in NEAR account against the resolved `orgAccountId` (`getOrgAccountId(reqHeaders)` → `defaultOrgAccount(network)`, env-driven). Time-series admin lists (billings, budgets, applications) are paginated cursor-style; the UI exposes a "load more" button.
 
-Fork this repo, remove or extend any of the modules above, and customize per agency. When you deploy your fork, rewrite [`ui/public/README.md`](./ui/public/README.md), [`ui/public/skill.md`](./ui/public/skill.md), and [`ui/public/manifest.json`](./ui/public/manifest.json) — those carry the maintainer's identity and ship as-is to the deployed site (manifest.json drives the install-prompt + browser-tab name).
+Instantiate a new agency via `bunx everything-dev init` (the canonical entry point — pulls the template, scaffolds a fresh repo and DB). Remove or extend any of the modules above, and customize per agency. Before deploying, rewrite [`ui/public/README.md`](./ui/public/README.md), [`ui/public/skill.md`](./ui/public/skill.md), and [`ui/public/manifest.json`](./ui/public/manifest.json) — those carry the maintainer's identity and ship as-is to the deployed site (manifest.json drives the install-prompt + browser-tab name).
 
-## First-time setup (forks)
+## First-time setup
 
-Every agency points this dashboard at its own Sputnik DAO. There are two paths — pick whichever fits your deployment workflow:
+A fresh deployment points at the maintainer's DAO (`multiagency.sputnik-dao.near`) and renders live data immediately. To take over a fresh deployment as your own agency, point it at your DAO.
 
 **Prerequisites**: NEAR account, Sputnik DAO contract on NEAR, Admin role in that DAO.
 
-**Path A — set the env var before deploying (recommended):**
+**Either** override the per-network default before deploying:
 
 ```bash
-export AGENCY_DAO_ACCOUNT=your-dao.sputnik-dao.near
+export AGENCY_ORG_ACCOUNT_MAINNET=your-dao.sputnik-dao.near
 bun install
 bun run db:migrate
 bos dev --host remote
 ```
 
-The plugin's `initialize` seeds `agency_settings.daoAccountId` from the env var the next time the process starts against an empty row. Admin gates work immediately. Use this path when you control your deployment environment.
+Admin nav appears once you sign in with a NEAR account that holds the `Admin` role on the configured DAO. If admin endpoints return FORBIDDEN, the dashboard is still pointed at a DAO you don't admin — update the env var and restart.
 
-**Path B — claim through the UI after deploy (fallback):**
+**Pointing at a testnet DAO.** The network is derived from the account's TLD — a `.sputnikv2.testnet` suffix routes Sputnik RPC to a testnet endpoint automatically. Set `NEAR_NETWORK=testnet` to switch the no-row fallback to `AGENCY_ORG_ACCOUNT_TESTNET` (default `multiagency.sputnikv2.testnet`):
 
-Deploy without setting the env var. Sign in with NEAR; admin routes redirect to `/settings`, which renders a "Set up your worksite" affordance. Submit your DAO account ID (and admin role name if your DAO uses something other than `Admin`, e.g. raw Sputnik's `council`). The handler verifies you're admin on the destination DAO before writing the row. Useful for PaaS hosts where env injection happens after deploy.
+```bash
+export NEAR_NETWORK=testnet
+export AGENCY_ORG_ACCOUNT_TESTNET=your-dao.sputnikv2.testnet
+```
 
-**Verification:** after either path, `/settings` shows your DAO account id and the admin nav appears. If admin endpoints return FORBIDDEN, the dashboard is still pointed at the placeholder DAO — re-run with the env var set, or use the claim flow.
+Override the RPC endpoint per network with `NEAR_RPC_URL_MAINNET=...` / `NEAR_RPC_URL_TESTNET=...` if you run a private RPC; otherwise the public fastnear endpoints route correctly per-account. `NEARN` integrations gracefully short-circuit on testnet (no testnet endpoints). Trezu deep-links use the mainnet URL pattern and may dead-link until Trezu publishes a testnet routing scheme. To stand up a testnet Sputnik DAO, use the `sputnikv2.testnet` factory's `create` method via `near-cli` or `near-cli-rs` with a policy mirroring mainnet's role shape — see the [Sputnik DAO contract README](https://github.com/near-daos/sputnik-dao-contract) for ABI reference.
 
 ## Quick Start
 
 ```bash
 bun install             # Install dependencies
-bun run db:migrate      # Apply API schema to ./api.db (one-time per fresh checkout)
-bos dev --host remote   # Start development (typical workflow)
+bun run dev:postgres    # Boot docker compose Postgres + start dev (persistent local dev)
+# or:
+bun run db:migrate && bun run dev   # Use the configured API_DATABASE_URL, or in-memory pglite by default
 ```
 
-The agency API plugin owns its own libsql database at `./api.db` and ships its
-own migrations in `api/src/db/migrations/`. `bun run db:migrate` applies them;
-the API plugin's `initialize` then upserts default rows (e.g. `agency_settings`)
-against the now-migrated schema. Skipping this step before `bos dev` causes
-`SQLITE_ERROR: no such table: ...` at API startup.
+The API plugin uses PostgreSQL via Drizzle. Without `API_DATABASE_URL` set, it boots against an in-memory `pglite` database — fine for quick exploration but state resets on every restart. For persistent local dev, `bun run dev:postgres` boots three Postgres instances via `docker-compose.yml` (api/auth/projects on 5432/5433/5434) and starts the dev server. Migrations live in `api/src/db/migrations/`; `bun run db:migrate` applies them against the configured database. Operational identity reads the `agency.settings` row (keyed by `orgAccountId`) when present, else falls through to env (`AGENCY_*` / `AGENCY_ORG_ACCOUNT_*`) and hardcoded defaults — a fresh database renders correctly with no manual seed.
 
-This serves the UI and API locally and mounts them on a remote host (loaded via `bos.config.json`'s `extends`).
-
-- UI: http://localhost:3003
-- API: http://localhost:3001 by default (check the ready output if ports auto-bump)
+This serves the UI and API locally and mounts them on a remote host (loaded via `bos.config.json`'s `extends`). See [AGENTS.md](./AGENTS.md#environment) for the full port table. UI defaults to `http://localhost:3003` (rsbuild auto-bumps if occupied — check the dev server output).
 
 ## CLI Commands
 
@@ -194,8 +190,8 @@ All runtime configuration lives in `bos.config.json`. The shape used by this rep
 
 ```json
 {
-  "account": "agency.near",
-  "extends": "bos://auth.everything.near/everything.dev",
+  "account": "multiagentic.near",
+  "extends": "bos://dev.everything.near/everything.dev",
   "domain": "multiagency.ai",
   "testnet": "agency.testnet",
   "staging": { "domain": "dev.multiagency.ai" },
@@ -209,7 +205,7 @@ All runtime configuration lives in `bos.config.json`. The shape used by this rep
 }
 ```
 
-The agency surface lives in `api/`. The upstream `projects` plugin is registered for host loading but not yet consumed by this fork (no UI route surfaces or `apiClient.projects.*` callers). See `AGENTS.md` for the plugin model.
+The agency surface lives in `api/`, which proxies the upstream `projects` plugin via `pluginsClient.projects(proxyCtx(orgAccountId))` for project CRUD (list/get/create/update). See `AGENTS.md` for the plugin model and proxy-as-org rule.
 
 `bos publish --deploy` is the release path when you want Zephyr URLs refreshed before publishing the config.
 
@@ -246,7 +242,7 @@ Biome is configured in `biome.json` at the project root. Generated files (like `
 
 **Database & Auth:**
 
-- SQLite (libsql) + Drizzle ORM
+- PostgreSQL + Drizzle ORM (`pglite` in-memory by default; `node-postgres` when `API_DATABASE_URL` is set)
 - Better-Auth with NEAR Protocol support
 
 ## Related Projects

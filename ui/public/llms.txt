@@ -1,6 +1,6 @@
 This site is MultiAgency's reference deployment of the Agency Dashboard Template — a customizable dashboard for on-chain agencies on NEAR.
 
-The template is a fork of the everything.dev runtime, shaped into a dashboard that integrates with Trezu (Sputnik DAO treasury) and NEARN (contributor sourcing). Off-chain ledger surfaces (allocations, billings) mirror agency decisions; the Sputnik DAO contract is the source of truth for funds and governance.
+The template extends the everything.dev runtime, shaped into a dashboard that integrates with Trezu (Sputnik DAO treasury) and NEARN (contributor sourcing). Off-chain ledger surfaces (budgets, billings) mirror agency decisions; the Sputnik DAO contract is the source of truth for funds and governance.
 
 Architecture:
 - host: runtime shell, auth boundary, request handling, runtime config loader
@@ -11,8 +11,7 @@ Public surface:
 - / — landing
 - /work — projects directory (enriched live from NEARN where linked)
 - /team — DAO roles, members, permissions (read from chain)
-- /treasury — live on-chain treasury balances
-- /payouts — DAO proposal / payout history
+- /treasury — live on-chain treasury balances; `payouts` tab carries DAO proposal / payout history
 - /docs — handbook (models, skills, legal docs)
 - /apply — express-interest form (contributor)
 - /register — express-interest form (founder)
@@ -23,11 +22,11 @@ Public surface:
 - /llms.txt
 
 Authenticated surface (DAO members only):
-- Same routes as public surface — operator sections (Manage Projects, Allocations, Contributors, Applications, Billings, Proposals) are revealed inline on /work, /treasury, /team, /payouts when the signed-in NEAR account holds an operator role on the DAO
+- Same routes as public surface — operator sections (Manage Projects, Budgets, Contributors, Applications, Billings, Proposals) are revealed inline on /work, /treasury, /team when the signed-in NEAR account holds an operator role on the DAO
 - /admin/projects/$slug — per-project deep dive (budget, contributors, NEARN snapshot)
-- /settings — agency identity + DAO configuration
+- /admin/settings — admin-only operational identity (NEARN account, urls, description, contact email); the active DAO (orgAccountId) is read-only here
 
 Useful assumptions:
 - The agency's treasury IS a Sputnik DAO contract; this dashboard observes via NEAR RPC
 - Payment proposals are submitted from NEARN's Sponsor Dashboard ("Pay with NEAR Treasury") or directly via Trezu — never from this dashboard
-- The underlying template lives at github.com/MultiAgency/dashboard; fork to deploy your own agency
+- The underlying template lives at github.com/MultiAgency/dashboard; run `bunx everything-dev init` to instantiate your own agency from it

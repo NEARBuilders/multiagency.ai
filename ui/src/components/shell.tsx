@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import type { ReactNode } from "react";
 import { GithubIcon, NearWordmark, XIcon } from "@/components/icons";
 import { Logo } from "@/components/logo";
+import { NetworkToggle } from "@/components/network-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,12 +25,10 @@ const PRIMARY_NAV: NavItem[] = [
   { to: "/docs", label: "docs" },
 ];
 
-const SETTINGS_ITEM: NavItem = { to: "/settings", label: "settings" };
-
 export function Shell({ children }: { children: ReactNode }) {
   const matchRoute = useMatchRoute();
   const apiClient = useApiClient();
-  const { isAuthenticated, isAdmin } = useMeRoles();
+  const { isAuthenticated } = useMeRoles();
 
   const publicSettingsQuery = useQuery(publicSettingsQueryOptions(apiClient));
   const brandName = publicSettingsQuery.data?.name?.trim() || "MultiAgency";
@@ -65,7 +64,6 @@ export function Shell({ children }: { children: ReactNode }) {
               {PRIMARY_NAV.map((item) => (
                 <NavLink key={item.to} item={item} active={linkActive(item.to)} />
               ))}
-              {isAdmin && <NavLink item={SETTINGS_ITEM} active={linkActive(SETTINGS_ITEM.to)} />}
               <a
                 href={getRepoUrl()}
                 target="_blank"
@@ -122,18 +120,9 @@ export function Shell({ children }: { children: ReactNode }) {
                       x
                     </a>
                   </DropdownMenuItem>
-                  {isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link
-                        to={SETTINGS_ITEM.to}
-                        className="font-mono text-xs uppercase tracking-wide"
-                      >
-                        {SETTINGS_ITEM.label}
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
+              <NetworkToggle />
               <UserNav />
             </div>
           </div>

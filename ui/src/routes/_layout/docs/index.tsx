@@ -62,9 +62,8 @@ function DocsIndex() {
                 className="border-2 border-border flex flex-col bg-card hover:bg-accent/20 transition-colors"
               >
                 <div className="p-4 flex-1 flex flex-col gap-3">
-                  <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    <span>{section === "skills" ? "skill" : "model"}</span>
-                    <span>md</span>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    {section === "skills" ? "skill" : "model"}
                   </div>
                   <h3 className="font-display text-xl uppercase tracking-tight font-extrabold leading-tight">
                     {d.title}

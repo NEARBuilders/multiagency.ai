@@ -5,7 +5,7 @@ description: Plain-English summary of the master services agreement between Mult
 
 # Services agreement
 
-> **Not legal or tax advice.** These pages describe how MultiAgency LLC is structured and operates — one working example, not a prescription. Entity types, tax treatment, and worker-classification rules vary by jurisdiction and change over time. Before forking this model, get qualified legal and tax counsel in the jurisdiction where your agency and contributors operate. This is an early draft, published to gather feedback — expect it to change.
+> **Not legal or tax advice.** These pages describe how MultiAgency LLC is structured and operates — one working example, not a prescription. Entity types, tax treatment, and worker-classification rules vary by jurisdiction and change over time. Before adapting this model, get qualified legal and tax counsel in the jurisdiction where your agency and contributors operate. This is an early draft, published to gather feedback — expect it to change.
 
 The master services agreement is a **single standing contract** between MultiAgency LLC and a contributor. One per contributor, signed once, reused across every project they take on. Specific scope, deliverables, and amounts live in the per-project [work order](/docs/work-order); the master sets the rules of the relationship.
 
@@ -65,7 +65,7 @@ Standard boilerplate: this agreement plus signed work orders are the whole deal;
 
 - It doesn't promise any work — that's the work order.
 - It doesn't transfer IP for past work — only IP created under signed work orders that say so.
-- It doesn't survive a fork: if MultiAgency LLC is replaced by a successor entity, contributors should sign with the new entity, not assume the master rolls over.
+- It doesn't survive an entity change: if MultiAgency LLC is replaced by a successor entity, contributors should sign with the new entity, not assume the master rolls over.
 
 ## Related
 

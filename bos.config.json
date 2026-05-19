@@ -12,7 +12,10 @@
   "app": {
     "ui": {
       "name": "ui",
-      "development": "local:ui"
+      "development": "local:ui",
+      "production": "https://multiagentic-35-ui-dashboard-multiagency-886badc3a-ze.zephyrcloud.app",
+      "integrity": "sha384-QJ3RqdKMdX6oknEBC02nA5xt0PkQX7XY/ZqB0qU/49ZgQBbTakQyLYgmJ6V+rAHX",
+      "ssr": "https://multiagentic-36-ui-dashboard-multiagency-1b4b00430-ze.zephyrcloud.app"
     },
     "api": {
       "name": "api",
@@ -21,13 +24,16 @@
         "API_DATABASE_URL",
         "APPLICATIONS_WEBHOOK_URL",
         "RESEND_API_KEY",
-        "NOTIFY_FROM_EMAIL"
-      ]
+        "NOTIFY_FROM_EMAIL",
+        "FASTNEAR_API_KEY"
+      ],
+      "production": "https://multiagentic-37-api-dashboard-multiagency-0639ceb90-ze.zephyrcloud.app",
+      "integrity": "sha384-z6sN4wSaUXhvTp4wyFRmZKGxhrQ2EZhBPf5JmKomKqCBe869IiI0nQDl7O4m7Ekv"
     }
   },
   "plugins": {
     "projects": {
-      "extends": "bos://work.efiz.near/projects.everything.dev#plugins.projects",
+      "extends": "bos://work.efiz.near/projects.everything.dev",
       "secrets": [
         "PROJECTS_DATABASE_URL"
       ],
