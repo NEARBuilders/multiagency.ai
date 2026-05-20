@@ -24,14 +24,40 @@ type ListingDataFields = Pick<
   | "status"
   | "token"
   | "rewardAmount"
+  | "compensationType"
+  | "minRewardAsk"
+  | "maxRewardAsk"
+  | "submissionLimit"
+  | "totalPaymentsMade"
+  | "totalWinnersSelected"
+  | "rewards"
+  | "maxBonusSpots"
+  | "usdValue"
+  | "skills"
+  | "region"
+  | "applicationType"
+  | "multipleSubmissionRule"
+  | "timeToComplete"
+  | "requirements"
+  | "sequentialId"
+  | "nearnPublishedAt"
   | "deadline"
   | "isPublished"
   | "isArchived"
+  | "isFeatured"
+  | "isPrivate"
   | "isWinnersAnnounced"
+  | "isHackathonPrize"
+  | "hackathonSlug"
+  | "hackathonName"
+  | "hackathonStartDate"
+  | "hackathonAnnounceDate"
   | "sponsorName"
   | "sponsorSlug"
   | "sponsorLogo"
   | "sponsorVerified"
+  | "sponsorEntityName"
+  | "sponsorIsCaution"
 >;
 
 // Number→BigInt precision-bounded: |n|≥1e21 → null; |n|<1e-6 uses toFixed (may carry IEEE-754 low-order noise).
@@ -55,14 +81,44 @@ export function mapNearnPayloadToListingFields(payload: NearnListing): ListingDa
     token: payload.token,
     rewardAmount:
       payload.rewardAmount === null ? null : numberToDecimalString(payload.rewardAmount),
+    compensationType: payload.compensationType,
+    minRewardAsk:
+      payload.minRewardAsk === null ? null : numberToDecimalString(payload.minRewardAsk),
+    maxRewardAsk:
+      payload.maxRewardAsk === null ? null : numberToDecimalString(payload.maxRewardAsk),
+    submissionLimit: payload.submissionLimit,
+    totalPaymentsMade: payload.totalPaymentsMade,
+    totalWinnersSelected: payload.totalWinnersSelected,
+    rewards: payload.rewards,
+    maxBonusSpots: payload.maxBonusSpots,
+    usdValue: payload.usdValue,
+    skills: payload.skills,
+    region: payload.region,
+    applicationType: payload.applicationType,
+    multipleSubmissionRule: payload.multipleSubmissionRule,
+    timeToComplete: payload.timeToComplete,
+    requirements: payload.requirements,
+    sequentialId: payload.sequentialId,
+    nearnPublishedAt: payload.nearnPublishedAt ? new Date(payload.nearnPublishedAt) : null,
     deadline: payload.deadline ? new Date(payload.deadline) : null,
     isPublished: payload.isPublished,
     isArchived: payload.isArchived,
+    isFeatured: payload.isFeatured,
+    isPrivate: payload.isPrivate,
     isWinnersAnnounced: payload.isWinnersAnnounced,
+    isHackathonPrize: payload.isHackathonPrize,
+    hackathonSlug: payload.hackathonSlug,
+    hackathonName: payload.hackathonName,
+    hackathonStartDate: payload.hackathonStartDate ? new Date(payload.hackathonStartDate) : null,
+    hackathonAnnounceDate: payload.hackathonAnnounceDate
+      ? new Date(payload.hackathonAnnounceDate)
+      : null,
     sponsorName: payload.sponsor?.name ?? null,
     sponsorSlug: payload.sponsor?.slug ?? null,
     sponsorLogo: payload.sponsor?.logo ?? null,
     sponsorVerified: payload.sponsor?.isVerified ?? null,
+    sponsorEntityName: payload.sponsor?.entityName ?? null,
+    sponsorIsCaution: payload.sponsor?.isCaution ?? null,
   };
 }
 
@@ -76,6 +132,32 @@ export function listingRowToNearnPayload(row: Listing): NearnListing | null {
     status: row.status,
     token: row.token,
     rewardAmount: row.rewardAmount === null ? null : Number(row.rewardAmount),
+    compensationType: row.compensationType,
+    minRewardAsk: row.minRewardAsk === null ? null : Number(row.minRewardAsk),
+    maxRewardAsk: row.maxRewardAsk === null ? null : Number(row.maxRewardAsk),
+    submissionLimit: row.submissionLimit,
+    totalPaymentsMade: row.totalPaymentsMade,
+    totalWinnersSelected: row.totalWinnersSelected,
+    rewards: row.rewards,
+    maxBonusSpots: row.maxBonusSpots,
+    usdValue: row.usdValue,
+    skills: row.skills,
+    region: row.region,
+    applicationType: row.applicationType,
+    multipleSubmissionRule: row.multipleSubmissionRule,
+    timeToComplete: row.timeToComplete,
+    requirements: row.requirements,
+    sequentialId: row.sequentialId,
+    nearnPublishedAt: row.nearnPublishedAt ? row.nearnPublishedAt.toISOString() : null,
+    isFeatured: row.isFeatured,
+    isPrivate: row.isPrivate,
+    isHackathonPrize: row.isHackathonPrize,
+    hackathonSlug: row.hackathonSlug,
+    hackathonName: row.hackathonName,
+    hackathonStartDate: row.hackathonStartDate ? row.hackathonStartDate.toISOString() : null,
+    hackathonAnnounceDate: row.hackathonAnnounceDate
+      ? row.hackathonAnnounceDate.toISOString()
+      : null,
     deadline: row.deadline ? row.deadline.toISOString() : null,
     isPublished: row.isPublished,
     isArchived: row.isArchived,
@@ -87,6 +169,8 @@ export function listingRowToNearnPayload(row: Listing): NearnListing | null {
             slug: row.sponsorSlug,
             logo: row.sponsorLogo,
             isVerified: row.sponsorVerified,
+            entityName: row.sponsorEntityName,
+            isCaution: row.sponsorIsCaution,
           }
         : null,
   };
@@ -130,8 +214,7 @@ export async function refreshNearnListing(
   }
 }
 
-// Attach NEARN listing; upserts by (project_id, source); throws if NEARN unavailable.
-// Pre-checks `(source, externalId)` to surface a typed conflict error before NEARN fetch.
+// Pre-checks slug collision to surface a typed conflict before the NEARN fetch.
 export async function attachNearnListing(
   projectId: string,
   slug: string,
@@ -172,6 +255,91 @@ export async function detachNearnListing(projectId: string, db: Database): Promi
   await db
     .delete(listings)
     .where(and(eq(listings.projectId, projectId), eq(listings.source, "nearn")));
+}
+
+export type InternalListingType = "Bounty" | "Project" | "Sponsorship";
+
+export interface InternalListingFields {
+  title: string;
+  type: InternalListingType;
+  token: string;
+  rewardAmount: string;
+  description?: string | null;
+  deadline?: Date | null;
+  isPublished?: boolean;
+  isArchived?: boolean;
+  isWinnersAnnounced?: boolean;
+}
+
+export async function createInternalListing(
+  projectId: string,
+  fields: InternalListingFields,
+  db: Database,
+): Promise<Listing> {
+  const [row] = await db
+    .insert(listings)
+    .values({
+      id: crypto.randomUUID(),
+      projectId,
+      source: "internal",
+      externalId: null,
+      title: fields.title,
+      description: fields.description ?? null,
+      type: fields.type,
+      token: fields.token,
+      rewardAmount: fields.rewardAmount,
+      compensationType: "fixed",
+      deadline: fields.deadline ?? null,
+      isPublished: fields.isPublished ?? false,
+      isArchived: fields.isArchived ?? false,
+      isWinnersAnnounced: fields.isWinnersAnnounced ?? false,
+      syncedAt: null,
+    })
+    .returning();
+  if (!row) throw new Error("internal listing insert returned no row");
+  return row;
+}
+
+export async function updateInternalListing(
+  projectId: string,
+  fields: Partial<InternalListingFields>,
+  db: Database,
+): Promise<Listing | null> {
+  const patch: Partial<NewListing> = {};
+  if (fields.title !== undefined) patch.title = fields.title;
+  if (fields.description !== undefined) patch.description = fields.description;
+  if (fields.type !== undefined) patch.type = fields.type;
+  if (fields.token !== undefined) patch.token = fields.token;
+  if (fields.rewardAmount !== undefined) patch.rewardAmount = fields.rewardAmount;
+  if (fields.deadline !== undefined) patch.deadline = fields.deadline;
+  if (fields.isPublished !== undefined) patch.isPublished = fields.isPublished;
+  if (fields.isArchived !== undefined) patch.isArchived = fields.isArchived;
+  if (fields.isWinnersAnnounced !== undefined) patch.isWinnersAnnounced = fields.isWinnersAnnounced;
+
+  if (Object.keys(patch).length === 0) {
+    const rows = await db
+      .select()
+      .from(listings)
+      .where(and(eq(listings.projectId, projectId), eq(listings.source, "internal")))
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  patch.updatedAt = new Date();
+  const [row] = await db
+    .update(listings)
+    .set(patch)
+    .where(and(eq(listings.projectId, projectId), eq(listings.source, "internal")))
+    .returning();
+  return row ?? null;
+}
+
+export async function deleteInternalListing(projectId: string, db: Database): Promise<boolean> {
+  const deleted = await db
+    .delete(listings)
+    .where(and(eq(listings.projectId, projectId), eq(listings.source, "internal")))
+    .returning({ id: listings.id });
+  return deleted.length > 0;
 }
 
 // Cascade project status to every listing (both sources). Idempotent.

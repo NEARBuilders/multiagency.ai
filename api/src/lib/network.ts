@@ -1,15 +1,12 @@
-// Per-request network: NEAR_NETWORK env > X-Network header > mainnet default.
-// Client sets the header via the apiClient fetch wrapper; SSR loaders propagate it
-// from the URL `?network=` param at the router boundary.
+// Per-request network: NEAR_NETWORK env pin > agency_view_network cookie > mainnet default.
+// The client sets the cookie (ui/src/lib/network.ts setNetwork); it rides the api client's
+// credentials:include and the SSR document request, so no framework-synced file is touched.
 import { type Network, pinnedNetwork } from "./default-org-account";
-
-export const NETWORK_HEADER = "x-network";
 
 export function getNetwork(reqHeaders: Headers | undefined): Network {
   const pinned = pinnedNetwork();
   if (pinned) return pinned;
-  const header = reqHeaders?.get(NETWORK_HEADER);
-  if (header === "testnet") return "testnet";
-  if (header === "mainnet") return "mainnet";
+  const m = reqHeaders?.get("cookie")?.match(/(?:^|;\s*)agency_view_network=(mainnet|testnet)/);
+  if (m) return m[1] as Network;
   return "mainnet";
 }

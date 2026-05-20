@@ -185,6 +185,27 @@ Returns one listing. The underlying model is the `Bounties` table in NEARN's Pri
 }
 ```
 
+### `GET /api/listings`
+
+Returns the public NEARN listings index — recent OPEN listings across all sponsors. Use for cross-sponsor discovery; for one sponsor's listings, prefer `POST /api/listings/sponsor`.
+
+**Query params (observed):**
+
+```ts
+{
+  take?: number;                   // default 10
+  type?: "bounty" | "project" | "hackathon" | "sponsorship";
+  // Default `type` filter is `{ in: ['bounty', 'project'] }` — sponsorships and
+  // hackathons are excluded until requested explicitly via `?type=sponsorship`
+  // or `?type=hackathon`. Other params (`sponsor`, `skills`, `regions`, `status`)
+  // are silently ignored — they return the default set regardless of value.
+}
+```
+
+**Filter applied by the handler:** same OPEN/public gating as the sponsor endpoint (`status: 'OPEN'`, `isPublished: true`, `isPrivate: false`, `isArchived: false`).
+
+**Response:** **bare array** (NOT wrapped in an object — different from the sponsor endpoint). Per-item shape identical to the sponsor endpoint's `bounties[N]`.
+
 ## URL conventions
 
 - **Public listing page:** `https://nearn.io/listing/<slug>`. The `slug` is the unique identifier on the `Bounties` model.

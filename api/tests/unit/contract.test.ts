@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   baseAmount,
   contract,
+  decimalAmount,
   httpUrl,
   nearAccountId,
   proposalListItem,
@@ -100,6 +101,36 @@ describe("baseAmount validator — positive-only smallest-unit integer", () => {
     expect(baseAmount.safeParse("1e6").success).toBe(false);
     expect(baseAmount.safeParse("").success).toBe(false);
     expect(baseAmount.safeParse(" 100").success).toBe(false);
+  });
+});
+
+describe("decimalAmount validator — positive display-unit amount for internal listings", () => {
+  test("accepts positive integers and decimals", () => {
+    expect(decimalAmount.safeParse("100").success).toBe(true);
+    expect(decimalAmount.safeParse("100.5").success).toBe(true);
+    expect(decimalAmount.safeParse("0.001").success).toBe(true);
+  });
+
+  test("rejects zero — a zero-reward listing has no rollup meaning", () => {
+    expect(decimalAmount.safeParse("0").success).toBe(false);
+    expect(decimalAmount.safeParse("0.0").success).toBe(false);
+    expect(decimalAmount.safeParse("0.000").success).toBe(false);
+  });
+
+  test("rejects negatives and malformed strings", () => {
+    expect(decimalAmount.safeParse("-100").success).toBe(false);
+    expect(decimalAmount.safeParse("100.5.5").success).toBe(false);
+    expect(decimalAmount.safeParse("").success).toBe(false);
+    expect(decimalAmount.safeParse("1e3").success).toBe(false);
+  });
+});
+
+describe("agency.listings contract — internal-listing CRUD surface", () => {
+  test("exposes adminGet, adminCreate, adminUpdate, adminDelete", () => {
+    expect(contract.agency.listings).toHaveProperty("adminGet");
+    expect(contract.agency.listings).toHaveProperty("adminCreate");
+    expect(contract.agency.listings).toHaveProperty("adminUpdate");
+    expect(contract.agency.listings).toHaveProperty("adminDelete");
   });
 });
 

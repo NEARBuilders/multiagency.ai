@@ -29,14 +29,23 @@ import {
 } from "./services/budgets";
 import {
   attachNearnListing,
+  createInternalListing,
+  deleteInternalListing,
   detachNearnListing,
   getListingForProject,
   getListingsForProjects,
+  type InternalListingFields,
   listingRowToNearnPayload,
   NearnListingConflictError,
   setListingsArchived,
+  updateInternalListing,
 } from "./services/listings";
-import { getNearnListing, isNearnAvailable, listNearnBountiesForSponsor } from "./services/nearn";
+import {
+  getNearnListing,
+  getNearnListingSubmissions,
+  isNearnAvailable,
+  listNearnBountiesForSponsor,
+} from "./services/nearn";
 import { notifyNewApplication } from "./services/notify";
 import { deleteProjectCascade } from "./services/projects";
 import {
@@ -323,7 +332,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         getListingForProject(projectId, "internal", orgId, db),
       ]);
       const bills = await Promise.all(billsRaw.map((b) => enrichWithChainStatus(b, orgId)));
-      const resolved = resolveActiveListing(nearnListing, internalListing);
+      const resolved = resolveActiveListing(nearnListing, internalListing, networkOf(orgId));
       const tokenIds = Array.from(
         new Set([
           ...budgetRows.map((b) => b.tokenId),
@@ -781,6 +790,88 @@ export default createPlugin.withPlugins<PluginsClient>()({
               return { deleted: true as const };
             }),
         },
+
+        listings: {
+          adminGet: builder.agency.listings.adminGet
+            .use(gates.operator)
+            .handler(async ({ context, input }) => {
+              const orgAccountId = await getOrgAccountId(context.reqHeaders);
+              await requireProjectInOrg(input.projectId, orgAccountId);
+              const row = await getListingForProject(
+                input.projectId,
+                "internal",
+                orgAccountId,
+                db,
+                { skipRefresh: true },
+              );
+              return { listing: row };
+            }),
+
+          adminCreate: builder.agency.listings.adminCreate
+            .use(gates.operator)
+            .handler(async ({ context, input }) => {
+              const orgAccountId = await getOrgAccountId(context.reqHeaders);
+              await requireProjectInOrg(input.projectId, orgAccountId);
+
+              const existing = await getListingForProject(
+                input.projectId,
+                "internal",
+                orgAccountId,
+                db,
+                { skipRefresh: true },
+              );
+              if (existing) {
+                throw new ORPCError("BAD_REQUEST", {
+                  message: "Project already has an internal listing; update or delete it instead.",
+                });
+              }
+
+              const fields: InternalListingFields = {
+                title: input.title,
+                type: input.type,
+                token: input.token,
+                rewardAmount: input.rewardAmount,
+                description: input.description ?? null,
+                deadline: input.deadline ?? null,
+                isPublished: input.isPublished,
+                isArchived: input.isArchived,
+                isWinnersAnnounced: input.isWinnersAnnounced,
+              };
+              const row = await createInternalListing(input.projectId, fields, db);
+              return { listing: row };
+            }),
+
+          adminUpdate: builder.agency.listings.adminUpdate
+            .use(gates.operator)
+            .handler(async ({ context, input }) => {
+              const orgAccountId = await getOrgAccountId(context.reqHeaders);
+              await requireProjectInOrg(input.projectId, orgAccountId);
+
+              const { projectId, ...patch } = input;
+              const row = await updateInternalListing(projectId, patch, db);
+              if (!row) {
+                throw new ORPCError("NOT_FOUND", {
+                  message: "No internal listing exists for this project",
+                });
+              }
+              return { listing: row };
+            }),
+
+          adminDelete: builder.agency.listings.adminDelete
+            .use(gates.operator)
+            .handler(async ({ context, input }) => {
+              const orgAccountId = await getOrgAccountId(context.reqHeaders);
+              await requireProjectInOrg(input.projectId, orgAccountId);
+
+              const removed = await deleteInternalListing(input.projectId, db);
+              if (!removed) {
+                throw new ORPCError("NOT_FOUND", {
+                  message: "No internal listing exists for this project",
+                });
+              }
+              return { deleted: true as const };
+            }),
+        },
       },
 
       contributors: {
@@ -1232,6 +1323,25 @@ export default createPlugin.withPlugins<PluginsClient>()({
             const bounties = await listNearnBountiesForSponsor(sponsorSlug);
             return { sponsorSlug, bounties };
           }),
+
+        listSubmissions: builder.nearn.listSubmissions
+          .use(gates.operator)
+          .handler(async ({ context, input }) => {
+            const orgAccountId = await getOrgAccountId(context.reqHeaders);
+            if (!isNearnAvailable(orgAccountId)) {
+              throw new ORPCError("NOT_FOUND", { message: "NEARN not available on this network" });
+            }
+            try {
+              const submissions = await getNearnListingSubmissions(input.slug);
+              return { submissions };
+            } catch (err) {
+              const message = (err as Error).message ?? "";
+              if (message.includes("not found")) {
+                throw new ORPCError("NOT_FOUND", { message });
+              }
+              throw err;
+            }
+          }),
       },
 
       tokens: {
@@ -1425,6 +1535,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
             })),
             nearnListings,
             internalListings,
+            network: networkOf(orgId),
           };
           const tokenIds = tokenIdsForRollup(rollupArgs);
           const balances = tokenIds.length > 0 ? await getTreasuryBalances(orgId, tokenIds) : {};
@@ -1542,6 +1653,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           const resolved = await getResolvedPublicSettings(db, network, orgAccountId);
           return {
             ...resolved,
+            network,
             networkPinned: pinnedNetwork() !== null,
           };
         }),

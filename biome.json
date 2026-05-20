@@ -13,6 +13,7 @@
       "recommended": true,
       "suspicious": {
         "noConsole": "off",
+        "noDocumentCookie": "off",
         "noExplicitAny": "off",
         "noTsIgnore": "off"
       },
@@ -51,8 +52,7 @@
       "!!**/plugins/**/types/**/*.d.ts",
       "!!**/env.d.ts",
       "!!**/virtual-modules.d.ts",
-      "!!bos.config.json",
-      "!!api/src/db/migrations"
+      "!!bos.config.json"
     ],
     "ignoreUnknown": true
   },

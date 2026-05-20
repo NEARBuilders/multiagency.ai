@@ -12,10 +12,7 @@
   "app": {
     "ui": {
       "name": "ui",
-      "development": "local:ui",
-      "production": "https://multiagentic-35-ui-dashboard-multiagency-886badc3a-ze.zephyrcloud.app",
-      "integrity": "sha384-QJ3RqdKMdX6oknEBC02nA5xt0PkQX7XY/ZqB0qU/49ZgQBbTakQyLYgmJ6V+rAHX",
-      "ssr": "https://multiagentic-36-ui-dashboard-multiagency-1b4b00430-ze.zephyrcloud.app"
+      "development": "local:ui"
     },
     "api": {
       "name": "api",
@@ -26,9 +23,7 @@
         "RESEND_API_KEY",
         "NOTIFY_FROM_EMAIL",
         "FASTNEAR_API_KEY"
-      ],
-      "production": "https://multiagentic-37-api-dashboard-multiagency-0639ceb90-ze.zephyrcloud.app",
-      "integrity": "sha384-z6sN4wSaUXhvTp4wyFRmZKGxhrQ2EZhBPf5JmKomKqCBe869IiI0nQDl7O4m7Ekv"
+      ]
     }
   },
   "plugins": {
@@ -48,8 +43,8 @@
   "shared": {
     "ui": {
       "effect": {
-        "version": "3.21.0",
-        "requiredVersion": "^3.21.0",
+        "version": "3.21.2",
+        "requiredVersion": "^3.21.2",
         "singleton": true,
         "strictVersion": false,
         "shareScope": "default"
@@ -62,36 +57,36 @@
         "shareScope": "default"
       },
       "@orpc/contract": {
-        "version": "1.13.14",
-        "requiredVersion": "^1.13.14",
+        "version": "1.14.3",
+        "requiredVersion": "^1.14.3",
         "singleton": true,
         "strictVersion": false,
         "shareScope": "default"
       },
       "better-auth": {
-        "version": "1.6.10",
-        "requiredVersion": "^1.6.10",
+        "version": "1.6.9",
+        "requiredVersion": "^1.6.9",
         "singleton": true,
         "strictVersion": false,
         "shareScope": "default"
       },
       "better-near-auth": {
-        "version": "1.4.2",
-        "requiredVersion": "^1.4.2",
+        "version": "1.5.0",
+        "requiredVersion": "^1.5.0",
         "singleton": true,
         "strictVersion": false,
         "shareScope": "default"
       },
       "@better-auth/api-key": {
-        "version": "1.6.10",
-        "requiredVersion": "^1.6.10",
+        "version": "1.6.9",
+        "requiredVersion": "^1.6.9",
         "singleton": true,
         "strictVersion": false,
         "shareScope": "default"
       },
       "@better-auth/passkey": {
-        "version": "1.6.10",
-        "requiredVersion": "^1.6.10",
+        "version": "1.6.9",
+        "requiredVersion": "^1.6.9",
         "singleton": true,
         "strictVersion": false,
         "shareScope": "default"

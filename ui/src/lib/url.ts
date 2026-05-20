@@ -1,0 +1,15 @@
+// Browser anchors execute `javascript:` / `data:` hrefs on click — gate user-supplied URLs to http(s).
+// Schemeless input ("drive.google.com/...", "x.com/...") gets `https://` prepended; common in NEARN
+// submission links. Returns the safe URL, or null when the input can't be normalized to http(s).
+export function safeHttpHref(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  const candidate = /^[a-z][a-z0-9+\-.]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const u = new URL(candidate);
+    return u.protocol === "http:" || u.protocol === "https:" ? candidate : null;
+  } catch {
+    return null;
+  }
+}

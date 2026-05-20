@@ -1,5 +1,5 @@
 {
-  "id": "1eb73866-c3c3-4a23-b8ef-d0447e8ff8a3",
+  "id": "e93a702c-6840-46b6-b1f7-015a8a329985",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -220,12 +220,8 @@
           "tableFrom": "billings",
           "tableTo": "contributors",
           "schemaTo": "agency",
-          "columnsFrom": [
-            "contributor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["contributor_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -473,6 +469,108 @@
           "primaryKey": false,
           "notNull": false
         },
+        "compensation_type": {
+          "name": "compensation_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "min_reward_ask": {
+          "name": "min_reward_ask",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_reward_ask": {
+          "name": "max_reward_ask",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_payments_made": {
+          "name": "total_payments_made",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_winners_selected": {
+          "name": "total_winners_selected",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submission_limit": {
+          "name": "submission_limit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rewards": {
+          "name": "rewards",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_bonus_spots": {
+          "name": "max_bonus_spots",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usd_value": {
+          "name": "usd_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "skills": {
+          "name": "skills",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "application_type": {
+          "name": "application_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "multiple_submission_rule": {
+          "name": "multiple_submission_rule",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "time_to_complete": {
+          "name": "time_to_complete",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requirements": {
+          "name": "requirements",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sequential_id": {
+          "name": "sequential_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nearn_published_at": {
+          "name": "nearn_published_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "deadline": {
           "name": "deadline",
           "type": "timestamp",
@@ -491,9 +589,51 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_featured": {
+          "name": "is_featured",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_private": {
+          "name": "is_private",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_winners_announced": {
           "name": "is_winners_announced",
           "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_hackathon_prize": {
+          "name": "is_hackathon_prize",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hackathon_slug": {
+          "name": "hackathon_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hackathon_name": {
+          "name": "hackathon_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hackathon_start_date": {
+          "name": "hackathon_start_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hackathon_announce_date": {
+          "name": "hackathon_announce_date",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -517,6 +657,18 @@
         },
         "sponsor_verified": {
           "name": "sponsor_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sponsor_entity_name": {
+          "name": "sponsor_entity_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sponsor_is_caution": {
+          "name": "sponsor_is_caution",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
@@ -646,12 +798,8 @@
           "tableFrom": "project_contributors",
           "tableTo": "contributors",
           "schemaTo": "agency",
-          "columnsFrom": [
-            "contributor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["contributor_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -659,10 +807,7 @@
       "compositePrimaryKeys": {
         "project_contributors_project_id_contributor_id_pk": {
           "name": "project_contributors_project_id_contributor_id_pk",
-          "columns": [
-            "project_id",
-            "contributor_id"
-          ]
+          "columns": ["project_id", "contributor_id"]
         }
       },
       "uniqueConstraints": {},
@@ -753,10 +898,7 @@
       "compositePrimaryKeys": {
         "proposals_dao_account_id_proposal_id_pk": {
           "name": "proposals_dao_account_id_proposal_id_pk",
-          "columns": [
-            "dao_account_id",
-            "proposal_id"
-          ]
+          "columns": ["dao_account_id", "proposal_id"]
         }
       },
       "uniqueConstraints": {},

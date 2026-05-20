@@ -134,6 +134,15 @@ export const KNOWN_TOKENS: KnownToken[] = [
     icon: `${ICON_BASE}/37529.png`,
   },
   {
+    tokenId: "near",
+    network: "near",
+    chainNetwork: "testnet",
+    symbol: "NEAR",
+    decimals: 24,
+    name: "NEAR Protocol (testnet)",
+    icon: `${ICON_BASE}/6535.png`,
+  },
+  {
     tokenId: "wrap.testnet",
     network: "near",
     chainNetwork: "testnet",
@@ -146,23 +155,25 @@ export const KNOWN_TOKENS: KnownToken[] = [
 
 const REGISTRY_BY_ID = new Map(KNOWN_TOKENS.map((t) => [t.tokenId, t]));
 
-// Mainnet-only (NEARN is mainnet-only); first-wins on symbol collision — order canonical entries first.
-const REGISTRY_BY_SYMBOL = (() => {
-  const map = new Map<string, KnownToken>();
-  for (const t of KNOWN_TOKENS) {
-    if (t.chainNetwork !== "mainnet") continue;
-    if (map.has(t.symbol)) continue;
-    map.set(t.symbol, t);
-  }
-  return map;
-})();
+// Per-network symbol registries; first-wins on symbol collision — order canonical entries first.
+const REGISTRY_BY_SYMBOL: Record<"mainnet" | "testnet", Map<string, KnownToken>> = {
+  mainnet: new Map(),
+  testnet: new Map(),
+};
+for (const t of KNOWN_TOKENS) {
+  const map = REGISTRY_BY_SYMBOL[t.chainNetwork];
+  if (!map.has(t.symbol)) map.set(t.symbol, t);
+}
 
 export function getTokenMetadata(tokenId: string): KnownToken | null {
   return REGISTRY_BY_ID.get(tokenId) ?? null;
 }
 
-export function getTokenMetadataBySymbol(symbol: string): KnownToken | null {
-  return REGISTRY_BY_SYMBOL.get(symbol) ?? null;
+export function getTokenMetadataBySymbol(
+  symbol: string,
+  network: "mainnet" | "testnet" = "mainnet",
+): KnownToken | null {
+  return REGISTRY_BY_SYMBOL[network].get(symbol) ?? null;
 }
 
 export function displayToBaseUnits(decimalString: string, decimals: number): bigint {

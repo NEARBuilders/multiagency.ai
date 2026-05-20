@@ -12,8 +12,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getNetwork, sessionQueryKey, sessionQueryOptions, setNetwork } from "@/lib/auth";
-import { meRolesQueryKey } from "@/lib/queries";
+import { useApiClient } from "@/lib/api";
+import { sessionQueryKey, sessionQueryOptions } from "@/lib/auth";
+import { getNetwork, setNetwork } from "@/lib/network";
+import { meRolesQueryKey, meRolesQueryOptions } from "@/lib/queries";
 
 type Network = "mainnet" | "testnet";
 
@@ -53,9 +55,12 @@ export function UserNav() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const authClient = useAuthClient();
+  const apiClient = useApiClient();
 
   const { data: session } = useQuery(sessionQueryOptions(authClient));
   const user = session?.user;
+  const { data: roles } = useQuery({ ...meRolesQueryOptions(apiClient), enabled: !!user });
+  const isAdmin = roles?.isAdmin ?? false;
 
   const connectMutation = useMutation({
     mutationFn: async () => {
@@ -150,6 +155,13 @@ export function UserNav() {
               profile
             </Link>
           </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link to="/admin/settings" className="font-mono text-xs uppercase tracking-wide">
+                settings
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"

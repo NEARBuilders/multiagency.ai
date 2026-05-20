@@ -1,12 +1,13 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { ApiClient } from "./api";
-import { getNetwork } from "./auth";
+import { getNetwork } from "./network";
 
 // Loader-hit queries include the active network in their queryKey so SSR data
 // cached under one network can't be served to a hydrating client requesting a
 // different network. Server-side `getNetwork()` falls through to the runtime
-// config default (no URL/localStorage on server); client-side reads URL →
-// localStorage. Mismatch triggers refetch with X-Network header on hydration.
+// config default (no URL/cookie readable on server); client-side reads URL →
+// cookie. Mismatch triggers a refetch on hydration (the agency_view_network
+// cookie rides the api client's credentials:include).
 //
 // Exported `*QueryKey` consts are invalidation prefixes — TanStack Query's
 // `invalidateQueries({ queryKey: [...] })` is prefix-match, so passing the
@@ -120,5 +121,46 @@ export function adminTokensQueryOptions(apiClient: ApiClient) {
     queryKey: adminTokensQueryKey,
     queryFn: () => apiClient.tokens.list(),
     staleTime: 60 * 60_000,
+  });
+}
+
+export const adminProjectDetailQueryKey = ["admin", "projects", "detail"] as const;
+
+export function adminProjectDetailQueryOptions(apiClient: ApiClient, slug: string) {
+  return queryOptions({
+    queryKey: [...adminProjectDetailQueryKey, getNetwork(), slug] as const,
+    queryFn: () => apiClient.agency.projects.adminGet({ slug }),
+    retry: false,
+  });
+}
+
+export const adminProjectBudgetQueryKey = ["admin", "projects", "budget"] as const;
+
+export function adminProjectBudgetQueryOptions(apiClient: ApiClient, projectId: string) {
+  return queryOptions({
+    queryKey: [...adminProjectBudgetQueryKey, getNetwork(), projectId] as const,
+    queryFn: () => apiClient.agency.projects.getBudget({ projectId }),
+    staleTime: 30_000,
+  });
+}
+
+export const adminInternalListingQueryKey = ["admin", "listings", "internal"] as const;
+
+export function adminInternalListingQueryOptions(apiClient: ApiClient, projectId: string) {
+  return queryOptions({
+    queryKey: [...adminInternalListingQueryKey, getNetwork(), projectId] as const,
+    queryFn: () => apiClient.agency.listings.adminGet({ projectId }),
+    retry: false,
+  });
+}
+
+export const adminNearnSubmissionsQueryKey = ["admin", "nearn", "submissions"] as const;
+
+export function adminNearnSubmissionsQueryOptions(apiClient: ApiClient, slug: string) {
+  return queryOptions({
+    queryKey: [...adminNearnSubmissionsQueryKey, getNetwork(), slug] as const,
+    queryFn: () => apiClient.nearn.listSubmissions({ slug }),
+    staleTime: 60_000,
+    retry: false,
   });
 }

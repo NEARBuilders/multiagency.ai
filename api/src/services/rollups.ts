@@ -33,15 +33,17 @@ export type TokenRollup = {
 };
 
 // Active listing for rollup math; NEARN > internal; null if no published+known-token entry.
+// Token symbol resolves within the deployment network — testnet listings need testnet entries.
 export function resolveActiveListing(
   nearnListing: Listing | null,
   internalListing: Listing | null,
+  network: "mainnet" | "testnet" = "mainnet",
 ): ResolvedListing | null {
   const active = nearnListing ?? internalListing;
   if (!active) return null;
   if (active.isPublished !== true || active.isArchived !== false) return null;
   if (!active.token || !active.rewardAmount) return null;
-  const known = getTokenMetadataBySymbol(active.token);
+  const known = getTokenMetadataBySymbol(active.token, network);
   if (!known) return null;
   return {
     tokenId: known.tokenId,
@@ -118,6 +120,7 @@ export function assembleAgencyRollups(input: {
   nearnListings: Map<string, Listing>;
   internalListings: Map<string, Listing>;
   balances: Record<string, string>;
+  network?: "mainnet" | "testnet";
 }): AgencyRollupItem[] {
   type TokenTotals = { budgeted: bigint; allocated: bigint; committed: bigint; paid: bigint };
   const zero = (): TokenTotals => ({
@@ -134,6 +137,7 @@ export function assembleAgencyRollups(input: {
     const resolved = resolveActiveListing(
       input.nearnListings.get(projectId) ?? null,
       input.internalListings.get(projectId) ?? null,
+      input.network,
     );
     const projectTokens = Array.from(
       new Set([
@@ -188,6 +192,7 @@ export function tokenIdsForRollup(input: {
   billingRows: ProjectBillingRow[];
   nearnListings: Map<string, Listing>;
   internalListings: Map<string, Listing>;
+  network?: "mainnet" | "testnet";
 }): string[] {
   const tokens = new Set<string>();
   for (const b of input.budgetRows) tokens.add(b.tokenId);
@@ -196,6 +201,7 @@ export function tokenIdsForRollup(input: {
     const resolved = resolveActiveListing(
       input.nearnListings.get(projectId) ?? null,
       input.internalListings.get(projectId) ?? null,
+      input.network,
     );
     if (resolved) tokens.add(resolved.tokenId);
   }

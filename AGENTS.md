@@ -29,6 +29,12 @@ skills:
     use: "everything-dev#dev-workflow"
   - when: "Publish bos.config.json to the FastKV registry, sync from upstream, and upgrade workspace packages. Use when deploying, syncing, or managing runtime configuration across projects."
     use: "everything-dev#publish-sync"
+  - when: "How bos.config.json extends chains work, deep merge semantics, resolved config lifecycle, env-specific parents, tenant runtime inheritance, or debugging config merge behavior."
+    use: "everything-dev#extends-config"
+  - when: "Scaffold a new project, extend an existing project from a parent runtime, sync upstream files, upgrade framework packages, or choose local override sections for ui/api/host/plugins."
+    use: "everything-dev#init-upgrade"
+  - when: "Build a super app with a shared host and shared API, set up fixed-core tenant mode, configure tenant UI overrides, or create custom tenant apps that extend a base runtime."
+    use: "everything-dev#super-app"
 <!-- intent-skills:end -->
 
 # Agent Instructions

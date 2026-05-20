@@ -51,14 +51,40 @@ export const listings = agency.table(
     status: text("status"),
     token: text("token"),
     rewardAmount: text("reward_amount"),
+    compensationType: text("compensation_type"),
+    minRewardAsk: text("min_reward_ask"),
+    maxRewardAsk: text("max_reward_ask"),
+    totalPaymentsMade: integer("total_payments_made"),
+    totalWinnersSelected: integer("total_winners_selected"),
+    submissionLimit: text("submission_limit"),
+    rewards: text("rewards"),
+    maxBonusSpots: integer("max_bonus_spots"),
+    usdValue: text("usd_value"),
+    skills: text("skills"),
+    region: text("region"),
+    applicationType: text("application_type"),
+    multipleSubmissionRule: text("multiple_submission_rule"),
+    timeToComplete: text("time_to_complete"),
+    requirements: text("requirements"),
+    sequentialId: integer("sequential_id"),
+    nearnPublishedAt: timestamp("nearn_published_at", { withTimezone: false }),
     deadline: timestamp("deadline", { withTimezone: false }),
     isPublished: boolean("is_published"),
     isArchived: boolean("is_archived"),
+    isFeatured: boolean("is_featured"),
+    isPrivate: boolean("is_private"),
     isWinnersAnnounced: boolean("is_winners_announced"),
+    isHackathonPrize: boolean("is_hackathon_prize"),
+    hackathonSlug: text("hackathon_slug"),
+    hackathonName: text("hackathon_name"),
+    hackathonStartDate: timestamp("hackathon_start_date", { withTimezone: false }),
+    hackathonAnnounceDate: timestamp("hackathon_announce_date", { withTimezone: false }),
     sponsorName: text("sponsor_name"),
     sponsorSlug: text("sponsor_slug"),
     sponsorLogo: text("sponsor_logo"),
     sponsorVerified: boolean("sponsor_verified"),
+    sponsorEntityName: text("sponsor_entity_name"),
+    sponsorIsCaution: boolean("sponsor_is_caution"),
     syncedAt: timestamp("synced_at", { withTimezone: false }),
     createdAt: timestamp("created_at", { withTimezone: false }).notNull().default(sql`now()`),
     updatedAt: timestamp("updated_at", { withTimezone: false }).notNull().default(sql`now()`),
@@ -184,14 +210,6 @@ export const proposals = agency.table(
 export type Proposal = typeof proposals.$inferSelect;
 export type NewProposal = typeof proposals.$inferInsert;
 
-// Per-DAO settings rows. Primary-keyed by orgAccountId (the Sputnik DAO account) — multi-tenant native:
-// each DAO gets its own row, identity is immutable. Single-tenant v1 resolves orgAccountId from env per
-// request; the row keyed by that orgAccountId carries editable operational identity. Multi-tenant v1
-// resolves orgAccountId from session/tenant context; same schema, no migration needed.
-// Brand identity (name/headline/tagline) stays hardcoded in settings-defaults.ts — not in the table.
-// Sputnik role names stay env-only — admin renaming a role they don't hold is an irreversible self-lockout.
-// Editable operational identity: nearnAccountId, websiteUrl, docsUrl, description, contactEmail.
-// orgAccountId itself is the row's immutable identity — "change DAO" is a deployment-level concern (env edit + restart).
 export const settings = agency.table("settings", {
   orgAccountId: text("org_account_id").primaryKey(),
   nearnAccountId: text("nearn_account_id"),
