@@ -13,9 +13,7 @@
     "ui": {
       "name": "ui",
       "development": "local:ui",
-      "production": "https://multiagentic-41-ui-dashboard-multiagency-48fa21962-ze.zephyrcloud.app",
-      "integrity": "sha384-RWbmVuvAH5NU2+0P/PEqdTegn+HGeBlhBeXMMy63YAJXBXl2Z+QliZNKzWj3lDJn",
-      "ssr": "https://multiagentic-42-ui-dashboard-multiagency-cd1e3ec2c-ze.zephyrcloud.app"
+      "production": "https://multiagentic-44-ui-dashboard-multiagency-5d2e9eb72-ze.zephyrcloud.app"
     },
     "api": {
       "name": "api",
@@ -27,7 +25,7 @@
         "NOTIFY_FROM_EMAIL",
         "FASTNEAR_API_KEY"
       ],
-      "production": "https://multiagentic-43-api-dashboard-multiagency-f0af83ab6-ze.zephyrcloud.app",
+      "production": "https://multiagentic-45-api-dashboard-multiagency-6c9df61a9-ze.zephyrcloud.app",
       "integrity": "sha384-ESctSmRKIXEL7wqK0itkDf4eMjK+8dnJHODEf0WipfUOdXHI4OdJWSitBAQelKd3"
     }
   },

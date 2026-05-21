@@ -4,9 +4,9 @@ import { getRuntimeConfig } from "everything-dev/ui/runtime";
 type Network = "mainnet" | "testnet";
 
 // Carries the active network to the server via a cookie (not a header) so it rides the api
-// client's existing `credentials: "include"` AND the SSR document request — meaning NO edit
-// to the framework-synced @/lib/api or @/lib/auth. Server-side reader: api/src/lib/network.ts.
-const NETWORK_COOKIE = "agency_view_network";
+// client's existing `credentials: "include"` — meaning NO edit to the framework-synced
+// @/lib/api or @/lib/auth. Server-side reader: api/src/lib/network.ts.
+const NETWORK_COOKIE = "current_near_network";
 
 function readRuntimeConfig(config?: Partial<ClientRuntimeConfig>) {
   if (config) return config;
@@ -20,7 +20,7 @@ function readRuntimeConfig(config?: Partial<ClientRuntimeConfig>) {
 
 function cookieNetwork(): Network | null {
   if (typeof document === "undefined") return null;
-  const m = document.cookie.match(/(?:^|;\s*)agency_view_network=(mainnet|testnet)/);
+  const m = document.cookie.match(/(?:^|;\s*)current_near_network=(mainnet|testnet)/);
   return m ? (m[1] as Network) : null;
 }
 
@@ -42,9 +42,9 @@ export function getNetwork(config?: Partial<ClientRuntimeConfig>): Network {
 export async function setNetwork(network: Network): Promise<void> {
   if (typeof window === "undefined") return;
   if (getNetwork() === network) return;
-  // Cookie carries the choice to the server (sent via credentials:include + the SSR request).
+  // Cookie carries the choice to the server, read per-request by api/src/lib/network.ts.
   document.cookie = `${NETWORK_COOKIE}=${network}; path=/; max-age=31536000; samesite=lax; secure`;
-  // URL is authoritative; full reload so SSR loaders re-fetch on the new network's shell.
+  // URL is authoritative; full reload so loaders re-fetch on the new network.
   const url = new URL(window.location.href);
   url.searchParams.set("network", network);
   window.location.href = url.toString();

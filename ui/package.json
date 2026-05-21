@@ -5,11 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "rsbuild dev",
-    "dev:ssr": "PORT=3004 BUILD_TARGET=server rsbuild dev",
-    "build": "bun run build:client && bun run build:ssr",
+    "build": "bun run build:client",
     "deploy": "DEPLOY=true bun run build",
-    "build:client": "BUILD_TARGET=client rsbuild build",
-    "build:ssr": "BUILD_TARGET=server rsbuild build",
+    "build:client": "rsbuild build",
     "preview": "rsbuild preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

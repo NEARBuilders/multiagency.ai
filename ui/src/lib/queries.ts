@@ -2,12 +2,11 @@ import { queryOptions } from "@tanstack/react-query";
 import type { ApiClient } from "./api";
 import { getNetwork } from "./network";
 
-// Loader-hit queries include the active network in their queryKey so SSR data
-// cached under one network can't be served to a hydrating client requesting a
-// different network. Server-side `getNetwork()` falls through to the runtime
-// config default (no URL/cookie readable on server); client-side reads URL →
-// cookie. Mismatch triggers a refetch on hydration (the agency_view_network
-// cookie rides the api client's credentials:include).
+// Loader-hit queries include the active network in their queryKey so data
+// cached under one network can't be served when the visitor switches to
+// another. `getNetwork()` reads URL → current_near_network cookie (client-only);
+// the cookie rides the api client's credentials:include so the server resolves
+// the same network for the fetch.
 //
 // Exported `*QueryKey` consts are invalidation prefixes — TanStack Query's
 // `invalidateQueries({ queryKey: [...] })` is prefix-match, so passing the

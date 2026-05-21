@@ -27,7 +27,7 @@ const headersWithCookie = (cookie: string | null): Headers => {
   return h;
 };
 
-describe("getNetwork — precedence: pinned > agency_view_network cookie > mainnet default", () => {
+describe("getNetwork — precedence: pinned > current_near_network cookie > mainnet default", () => {
   test("no pin, no cookie → mainnet default", () => {
     expect(getNetwork(new Headers())).toBe("mainnet");
   });
@@ -37,41 +37,41 @@ describe("getNetwork — precedence: pinned > agency_view_network cookie > mainn
   });
 
   test("cookie testnet → testnet (free mode)", () => {
-    expect(getNetwork(headersWithCookie("agency_view_network=testnet"))).toBe("testnet");
+    expect(getNetwork(headersWithCookie("current_near_network=testnet"))).toBe("testnet");
   });
 
   test("cookie mainnet → mainnet (free mode)", () => {
-    expect(getNetwork(headersWithCookie("agency_view_network=mainnet"))).toBe("mainnet");
+    expect(getNetwork(headersWithCookie("current_near_network=mainnet"))).toBe("mainnet");
   });
 
   test("cookie parsed when surrounded by other cookies", () => {
-    expect(getNetwork(headersWithCookie("foo=bar; agency_view_network=testnet; baz=qux"))).toBe(
+    expect(getNetwork(headersWithCookie("foo=bar; current_near_network=testnet; baz=qux"))).toBe(
       "testnet",
     );
   });
 
   test("unrecognized cookie value falls through to mainnet", () => {
-    expect(getNetwork(headersWithCookie("agency_view_network=betanet"))).toBe("mainnet");
+    expect(getNetwork(headersWithCookie("current_near_network=betanet"))).toBe("mainnet");
   });
 
-  test("no agency_view_network cookie among others → mainnet default", () => {
+  test("no current_near_network cookie among others → mainnet default", () => {
     expect(getNetwork(headersWithCookie("foo=bar; baz=qux"))).toBe("mainnet");
   });
 
   test("`NEAR_NETWORK=testnet` pins testnet regardless of cookie", () => {
     process.env.NEAR_NETWORK = "testnet";
-    expect(getNetwork(headersWithCookie("agency_view_network=mainnet"))).toBe("testnet");
+    expect(getNetwork(headersWithCookie("current_near_network=mainnet"))).toBe("testnet");
     expect(getNetwork(headersWithCookie(null))).toBe("testnet");
   });
 
   test("`NEAR_NETWORK=mainnet` pins mainnet regardless of cookie", () => {
     process.env.NEAR_NETWORK = "mainnet";
-    expect(getNetwork(headersWithCookie("agency_view_network=testnet"))).toBe("mainnet");
+    expect(getNetwork(headersWithCookie("current_near_network=testnet"))).toBe("mainnet");
   });
 
   test("unrecognized `NEAR_NETWORK` value does not pin — cookie still applies", () => {
     process.env.NEAR_NETWORK = "betanet";
-    expect(getNetwork(headersWithCookie("agency_view_network=testnet"))).toBe("testnet");
+    expect(getNetwork(headersWithCookie("current_near_network=testnet"))).toBe("testnet");
     expect(getNetwork(headersWithCookie(null))).toBe("mainnet");
   });
 });

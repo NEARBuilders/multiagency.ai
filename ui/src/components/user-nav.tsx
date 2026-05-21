@@ -181,8 +181,8 @@ export function UserNav() {
 }
 
 // Pre-connect button. Tells the user which network they're about to authenticate against —
-// reduces the wallet-network-mismatch toast we'd otherwise show reactively. SSR-naive: getNetwork
-// reads URL+localStorage (client-only), so we render the bare label first then upgrade on mount.
+// reduces the wallet-network-mismatch toast we'd otherwise show reactively. getNetwork reads
+// URL+cookie (client-only), so we render the bare label first then upgrade on mount.
 function ConnectButton({ connect }: { connect: { mutate: () => void; isPending: boolean } }) {
   // Local `setNetwork` shadows the imported auth helper, intentionally — the import only fires
   // from the outer UserNav mutation, never inside this component. Keeping the natural name.

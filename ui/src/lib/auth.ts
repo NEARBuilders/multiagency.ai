@@ -53,7 +53,7 @@ function getCspNonce(config?: Partial<ClientRuntimeConfig>) {
   return undefined;
 }
 
-export function createAuthClient(config?: Partial<ClientRuntimeConfig>, headers?: HeadersInit) {
+export function createAuthClient(config?: Partial<ClientRuntimeConfig>) {
   const nearAuthConfig = {
     recipient: getAccountId(config),
     networkId: getNetworkId(config),
@@ -64,7 +64,6 @@ export function createAuthClient(config?: Partial<ClientRuntimeConfig>, headers?
     baseURL: getHostUrl(config),
     fetchOptions: {
       credentials: "include",
-      ...(headers ? { headers } : {}),
     },
     plugins: [
       inferAdditionalFields<Auth>(),
