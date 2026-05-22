@@ -12,8 +12,7 @@
   "app": {
     "ui": {
       "name": "ui",
-      "development": "local:ui",
-      "production": "https://multiagentic-44-ui-dashboard-multiagency-5d2e9eb72-ze.zephyrcloud.app"
+      "development": "local:ui"
     },
     "api": {
       "name": "api",
@@ -24,26 +23,6 @@
         "RESEND_API_KEY",
         "NOTIFY_FROM_EMAIL",
         "FASTNEAR_API_KEY"
-      ],
-      "production": "https://multiagentic-45-api-dashboard-multiagency-6c9df61a9-ze.zephyrcloud.app",
-      "integrity": "sha384-ESctSmRKIXEL7wqK0itkDf4eMjK+8dnJHODEf0WipfUOdXHI4OdJWSitBAQelKd3"
-    }
-  },
-  "plugins": {
-    "projects": {
-      "extends": "bos://work.efiz.near/projects.everything.dev#plugins.projects",
-      "secrets": [
-        "PROJECTS_DATABASE_URL"
-      ],
-      "sidebar": [
-        {
-          "icon": "FolderKanban",
-          "label": "projects"
-        }
-      ],
-      "development": "local:plugins/projects",
-      "routes": [
-        "ui/src/routes/_layout/_authenticated/projects/**"
       ]
     }
   },

@@ -14,6 +14,10 @@
  *   router.tsx        — Client router factory. Consumes the context set up
  *                        during hydration. Uses browser history.
  *
+ *   router.server.tsx — SSR router factory. Creates request-scoped server
+ *                        router and server-side API/auth clients per request.
+ *                        Mirrors client router shape for hydration consistency.
+ *
  *   routes/__root.tsx — HTML shell, head/scripts/styles, runtime config
  *                        handoff. Root boundary between host-rendered
  *                        document and the UI application.

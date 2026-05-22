@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ModuleFederationPlugin } from "@module-federation/enhanced/rspack";
 import { pluginModuleFederation } from "@module-federation/rsbuild-plugin";
 import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
@@ -14,6 +15,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const normalizedName = pkg.name;
 const shouldDeploy = process.env.DEPLOY === "true";
+const buildTarget = process.env.BUILD_TARGET as "client" | "server" | undefined;
+const isServerBuild = buildTarget === "server";
 
 const resolvedConfigPath = path.resolve(__dirname, "../.bos/bos.resolved-config.json");
 const bosConfigPath = path.resolve(__dirname, "../bos.config.json");
@@ -26,7 +29,7 @@ const bosConfig = fs.existsSync(resolvedConfigPath)
   : JSON.parse(fs.readFileSync(bosConfigPath, "utf8"));
 const uiSharedDeps = bosConfig.shared?.ui ?? {};
 
-function updateBosConfig(url: string, integrity?: string) {
+function updateBosConfig(field: "production" | "ssr", url: string, integrity?: string) {
   try {
     const configPath = path.resolve(__dirname, "../bos.config.json");
     const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
@@ -36,109 +39,191 @@ function updateBosConfig(url: string, integrity?: string) {
       return;
     }
 
-    config.app.ui.production = url;
+    config.app.ui[field] = url;
+    const integrityField = field === "production" ? "integrity" : "ssrIntegrity";
     if (integrity) {
-      config.app.ui.integrity = integrity;
+      config.app.ui[integrityField] = integrity;
     } else {
-      delete config.app.ui.integrity;
+      delete config.app.ui[integrityField];
     }
     fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-    console.log("   ✅ Updated bos.config.json: app.ui.production");
+    console.log(`   ✅ Updated bos.config.json: app.ui.${field}`);
     if (integrity) {
-      console.log("   ✅ Updated bos.config.json: app.ui.integrity");
+      console.log(`   ✅ Updated bos.config.json: app.ui.${integrityField}`);
     }
   } catch (err) {
     console.error("   ❌ Failed to update bos.config.json:", (err as Error).message);
   }
 }
 
-const plugins = [
-  pluginReact(),
-  pluginModuleFederation({
-    name: normalizedName,
-    filename: "remoteEntry.js",
-    dts: false,
-    exposes: {
-      "./Router": "./src/router.tsx",
-      "./Hydrate": "./src/hydrate.tsx",
-      "./components": "./src/components/index.ts",
-      "./providers": "./src/providers/index.tsx",
-      "./hooks": "./src/hooks/index.ts",
-    },
-    shared: uiSharedDeps,
-  }),
-];
-
-if (shouldDeploy) {
-  plugins.push(
-    withZephyr({
-      hooks: {
-        onDeployComplete: async (info) => {
-          console.log("🚀 UI Client Deployed:", info.url);
-          const integrity = await computeSriHashForUrl(info.url);
-          updateBosConfig(info.url, integrity ?? undefined);
-        },
+function createClientConfig() {
+  const plugins = [
+    pluginReact(),
+    pluginModuleFederation({
+      name: normalizedName,
+      filename: "remoteEntry.js",
+      dts: false,
+      exposes: {
+        "./Router": "./src/router.tsx",
+        "./Hydrate": "./src/hydrate.tsx",
+        "./components": "./src/components/index.ts",
+        "./providers": "./src/providers/index.tsx",
+        "./hooks": "./src/hooks/index.ts",
       },
+      shared: uiSharedDeps,
     }),
-  );
+  ];
+
+  if (shouldDeploy) {
+    plugins.push(
+      withZephyr({
+        hooks: {
+          onDeployComplete: async (info) => {
+            console.log("🚀 UI Client Deployed:", info.url);
+            const integrity = await computeSriHashForUrl(info.url);
+            updateBosConfig("production", info.url, integrity ?? undefined);
+          },
+        },
+      }),
+    );
+  }
+
+  return defineConfig({
+    plugins,
+    source: {
+      entry: {
+        index: "./src/hydrate.tsx",
+      },
+      define: {
+        "import.meta.env.APP_NAME": JSON.stringify(bosConfig.domain),
+        "import.meta.env.APP_ACCOUNT": JSON.stringify(bosConfig.account),
+      },
+    },
+    resolve: {
+      alias: {
+        "@": "./src",
+      },
+    },
+    dev: {
+      lazyCompilation: false,
+      progressBar: false,
+      client: {
+        overlay: false,
+      },
+    },
+    server: {
+      port: isServerBuild ? 3004 : 3003,
+      printUrls: ({ urls }) => urls.filter((url) => url.includes("localhost")),
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    },
+    tools: {
+      rspack: {
+        target: "web",
+        output: {
+          uniqueName: normalizedName,
+        },
+        resolve: {
+          fallback: { bufferutil: false, "utf-8-validate": false },
+        },
+        infrastructureLogging: { level: "error" },
+        stats: "errors-warnings",
+        plugins: [
+          TanStackRouterRspack({
+            target: "react",
+            autoCodeSplitting: true,
+          }),
+          new FixMfDataUriPlugin(),
+        ],
+      },
+    },
+    output: {
+      distPath: { root: "dist", css: "static/css", js: "static/js" },
+      assetPrefix: "auto",
+      filename: { js: "[name].js", css: "style.css" },
+      copy: [{ from: path.resolve(__dirname, "public"), to: "./" }],
+    },
+  });
 }
 
-export default defineConfig({
-  plugins,
-  source: {
-    entry: {
-      index: "./src/hydrate.tsx",
-    },
-    define: {
-      "import.meta.env.APP_NAME": JSON.stringify(bosConfig.domain),
-      "import.meta.env.APP_ACCOUNT": JSON.stringify(bosConfig.account),
-    },
-  },
-  resolve: {
-    alias: {
-      "@": "./src",
-    },
-  },
-  dev: {
-    lazyCompilation: false,
-    progressBar: false,
-    client: {
-      overlay: false,
-    },
-  },
-  server: {
-    port: 3003,
-    printUrls: ({ urls }) => urls.filter((url) => url.includes("localhost")),
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  },
-  tools: {
-    rspack: {
-      target: "web",
-      output: {
-        uniqueName: normalizedName,
+function createServerConfig() {
+  const plugins = [pluginReact()];
+
+  if (shouldDeploy) {
+    plugins.push(
+      withZephyr({
+        hooks: {
+          onDeployComplete: async (info) => {
+            console.log("🚀 UI SSR Deployed:", info.url);
+            const integrity = await computeSriHashForUrl(info.url);
+            updateBosConfig("ssr", info.url, integrity ?? undefined);
+          },
+        },
+      }),
+    );
+  }
+
+  return defineConfig({
+    plugins,
+    source: {
+      entry: {
+        index: "./src/router.server.tsx",
       },
-      resolve: {
-        fallback: { bufferutil: false, "utf-8-validate": false },
-      },
-      infrastructureLogging: { level: "error" },
-      stats: "errors-warnings",
-      plugins: [
-        TanStackRouterRspack({
-          target: "react",
-          autoCodeSplitting: true,
-        }),
-        new FixMfDataUriPlugin(),
-      ],
     },
-  },
-  output: {
-    distPath: { root: "dist", css: "static/css", js: "static/js" },
-    assetPrefix: "auto",
-    filename: { js: "[name].js", css: "style.css" },
-    copy: [{ from: path.resolve(__dirname, "public"), to: "./" }],
-  },
-});
+    resolve: {
+      alias: {
+        "@": "./src",
+        "@tanstack/react-devtools": false,
+        "@tanstack/react-router-devtools": false,
+      },
+    },
+    server: {
+      port: 3004,
+      printUrls: ({ urls }) => urls.filter((url) => url.includes("localhost")),
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    },
+    tools: {
+      rspack: {
+        target: "async-node",
+        output: {
+          uniqueName: `${normalizedName}_server`,
+          publicPath: "auto",
+          library: { type: "commonjs-module" },
+        },
+        resolve: {
+          fallback: { bufferutil: false, "utf-8-validate": false },
+        },
+        externals: [/^node:/],
+        infrastructureLogging: { level: "error" },
+        stats: "errors-warnings",
+        plugins: [
+          TanStackRouterRspack({ target: "react", autoCodeSplitting: false }),
+          new FixMfDataUriPlugin(),
+          new ModuleFederationPlugin({
+            name: normalizedName,
+            filename: "remoteEntry.server.js",
+            dts: false,
+            runtimePlugins: [require.resolve("@module-federation/node/runtimePlugin")],
+            library: { type: "commonjs-module" },
+            exposes: { "./Router": "./src/router.server.tsx" },
+            shared: uiSharedDeps,
+          }),
+        ],
+      },
+    },
+    output: {
+      distPath: { root: "dist" },
+      assetPrefix: "auto",
+      cleanDistPath: false,
+    },
+  });
+}
+
+export default isServerBuild ? createServerConfig() : createClientConfig();
