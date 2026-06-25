@@ -281,8 +281,6 @@ fabric.properties
 
 ### Miscellaneous
 
-# documentation
-.docs
 /content
 
 # dependencies
