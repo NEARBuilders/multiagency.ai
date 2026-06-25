@@ -25,5 +25,22 @@
         "FASTNEAR_API_KEY"
       ]
     }
+  },
+  "plugins": {
+    "projects": {
+      "development": "local:plugins/projects",
+      "secrets": [
+        "PROJECTS_DATABASE_URL"
+      ],
+      "routes": [
+        "ui/src/routes/_layout/_authenticated/projects/**"
+      ],
+      "sidebar": [
+        {
+          "icon": "FolderKanban",
+          "label": "projects"
+        }
+      ]
+    }
   }
 }
