@@ -18,7 +18,7 @@ import {
 import { ProjectsAdminSection } from "@/components/projects-admin-section";
 import { useMeRoles } from "@/hooks/use-me-roles";
 import { useApiClient } from "@/lib/api";
-import { nearnListingUrl, nearnSponsorUrl } from "@/lib/nearn";
+import { formatNearnReward, nearnListingUrl, nearnSponsorUrl } from "@/lib/nearn";
 import { projectsListQueryOptions, publicSettingsQueryOptions } from "@/lib/queries";
 
 export const Route = createFileRoute("/_layout/work")({
@@ -51,6 +51,11 @@ type ProjectListItem = {
     type?: string | null;
     description?: string | null;
     rewardAmount?: number | null;
+    compensationType?: string | null;
+    minRewardAsk?: number | null;
+    maxRewardAsk?: number | null;
+    totalPaymentsMade?: number | null;
+    totalWinnersSelected?: number | null;
     token?: string | null;
     deadline?: string | null;
   } | null;
@@ -183,7 +188,14 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
       <CardContent className="p-4 flex-1 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           <span className="truncate">@{project.slug}</span>
-          {n?.status ? <Badge variant="default">{n.status}</Badge> : <span>{project.status}</span>}
+          <div className="flex items-center gap-1.5">
+            {n?.type && <Badge variant="outline">{n.type}</Badge>}
+            {n?.status ? (
+              <Badge variant="default">{n.status}</Badge>
+            ) : (
+              <span>{project.status}</span>
+            )}
+          </div>
         </div>
         <h2 className="font-display text-xl uppercase tracking-tight font-extrabold leading-tight break-words">
           {project.title}
@@ -194,10 +206,10 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
           </p>
         )}
         <div className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground space-y-1">
-          {n?.type && <div>type · {n.type}</div>}
-          {n?.rewardAmount !== undefined && n?.rewardAmount !== null && n?.token && (
+          {n && <div>reward · {formatNearnReward(n)}</div>}
+          {n?.totalWinnersSelected != null && n.totalWinnersSelected > 0 && (
             <div>
-              reward · <span className="tabular-nums">{n.rewardAmount}</span> {n.token}
+              {n.totalPaymentsMade ?? 0} of {n.totalWinnersSelected} paid
             </div>
           )}
           {n?.deadline && <div>deadline · {new Date(n.deadline).toISOString().slice(0, 10)}</div>}
