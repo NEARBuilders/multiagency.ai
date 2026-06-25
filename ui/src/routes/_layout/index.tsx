@@ -73,7 +73,7 @@ type LandingProject = {
 function Landing() {
   const apiClient = useApiClient();
   const loaderData = RootRoute.useLoaderData();
-  const assetsUrl = loaderData?.runtimeConfig?.assetsUrl ?? "";
+  const assetsUrl = loaderData?.assetsUrl ?? "";
 
   const settingsQuery = useQuery(publicSettingsQueryOptions(apiClient));
   const projectsQuery = useQuery(projectsListQueryOptions(apiClient));

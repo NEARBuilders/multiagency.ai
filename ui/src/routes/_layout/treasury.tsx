@@ -35,12 +35,12 @@ import {
   STATUS_LABEL,
   type StatusBucket,
 } from "@/components/proposals-list";
-import { TreasuryRollups, TreasuryRollupsChart } from "@/components/treasury-rollups";
+import { TreasuryRollups } from "@/components/treasury-rollups";
 import { useMeRoles } from "@/hooks/use-me-roles";
 import { useApiClient } from "@/lib/api";
+import { getNetwork } from "@/lib/auth";
 import { csvTimestamp, downloadCsv } from "@/lib/csv";
 import { formatTokenAmount, tokenSymbol } from "@/lib/format-amount";
-import { getNetwork } from "@/lib/network";
 import {
   adminContributorsListQueryOptions,
   adminProjectsListQueryOptions,
@@ -58,14 +58,16 @@ const searchSchema = z.object({
   status: z.string().optional(),
   token: z.string().optional(),
   q: z.string().optional(),
-  // Declared so `navigate({ search })` preserves `?network=` across filter clicks.
+  // Present in the schema only so `navigate({ search })` preserves it through filter clicks.
+  // `getNetwork()` reads URL directly; this field is never consumed here.
   network: z.enum(["mainnet", "testnet"]).optional(),
 });
 
 type TreasurySearch = z.infer<typeof searchSchema>;
 
 export const Route = createFileRoute("/_layout/treasury")({
-  // Tolerant: unknown/legacy ?tab values fall back to defaults rather than throwing.
+  // Tolerant parsing: unknown/legacy values (e.g. bookmarked `?tab=billings`) fall back to
+  // defaults rather than throwing into the router error boundary.
   validateSearch: (raw: Record<string, unknown>) => searchSchema.safeParse(raw).data ?? {},
   head: () => ({
     meta: [
@@ -143,7 +145,8 @@ function TreasuryPage() {
     initialData: loaderData.balances ?? undefined,
   });
 
-  // Empty tokenIds = loader caught an RPC error; don't render the balances skeleton then.
+  // Guard against showing a balances-loading skeleton when there are no tokens to fetch:
+  // an empty tokenIds list means the loader caught an RPC error and degraded to null.
   const isLoading = tokensQuery.isLoading || (tokenIds.length > 0 && balancesQuery.isLoading);
   const balanceByToken = new Map(
     (balancesQuery.data?.balances ?? []).map((b) => [b.tokenId, b.balance]),
@@ -249,8 +252,7 @@ function TreasuryPage() {
           <TabsContent value="payouts" className="mt-6">
             <ProposalsList {...proposalsListProps} />
           </TabsContent>
-          <TabsContent value="overview" className="mt-6 space-y-6">
-            <TreasuryRollupsChart />
+          <TabsContent value="overview" className="mt-6">
             <TreasuryRollups />
           </TabsContent>
           <TabsContent value="budgets" className="mt-6 space-y-4">

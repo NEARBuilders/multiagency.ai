@@ -1,14 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useApiClient, useAuthClient } from "@/app";
-import { sessionQueryOptions } from "@/lib/auth";
-import { getNetwork, setNetwork } from "@/lib/network";
+import { getNetwork, sessionQueryOptions, setNetwork } from "@/lib/auth";
 import { publicSettingsQueryOptions } from "@/lib/queries";
 
 type Network = "mainnet" | "testnet";
 
 export function NetworkToggle() {
-  // Skip SSR — cookie/URL-driven hydration risks class mismatch with runtime config.
+  // Skip SSR — localStorage-driven hydration risks class mismatch with runtime config.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
