@@ -342,6 +342,29 @@ export default createPlugin.withPlugins<PluginsClient>()({
       },
     );
 
+    // Soft auth: fills org/role context if the user has a session, passes through otherwise.
+    // Used by adaptive endpoints that return different data shapes based on role.
+    const tryOrgAuth = builder.middleware(
+      async ({ context, next }: { context: any; next: any }) => {
+        if (!context.user || !context.userId) return next();
+        const isSuperAdmin = (context.user as any)?.role === "admin";
+        const daoAccountId = await getOrgAccountId(context.reqHeaders);
+        const org = authDb ? await authDb.findOrgByDaoAccountId(daoAccountId) : null;
+        const memberRole =
+          org && authDb ? await authDb.getMemberRole(context.userId, org.id) : null;
+        return next({
+          context: {
+            ...context,
+            organizationId: org?.id ?? null,
+            memberRole: isSuperAdmin && !memberRole ? "admin" : memberRole,
+            nearAccountId: context.near?.primaryAccountId ?? null,
+            isSuperAdmin,
+            orgMetadata: org?.metadata ?? null,
+          },
+        });
+      },
+    );
+
     const gates = {
       admin: requireOrgRole(["admin"]),
       contributor: requireOrgRole(["admin", "contributor"]),
@@ -441,10 +464,15 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
     // Proxy context passed to the projects plugin. Scoped by DAO/env org account.
     // memberRole threads the better-auth org role for permission checks in the projects plugin.
-    const proxyCtx = (orgAccountId: string, memberRole?: string | null) => ({
-      userId: orgAccountId,
-      walletAddress: orgAccountId,
-      user: { id: orgAccountId, role: memberRole ?? undefined },
+    // organizationId prefers the better-auth UUID over the Sputnik DAO account string for ownerId.
+    const proxyCtx = (
+      orgAccountId: string,
+      memberRole?: string | null,
+      organizationId?: string | null,
+    ) => ({
+      userId: organizationId ?? orgAccountId,
+      walletAddress: organizationId ?? orgAccountId,
+      user: { id: organizationId ?? orgAccountId, role: memberRole ?? undefined },
     });
 
     const toContractProject = (
@@ -460,6 +488,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       description: p.description,
       repository: p.repository ?? null,
       nearnListingId,
+      kind: ((p as any).kind ?? "project") as "project" | "idea",
       status: p.status,
       visibility: p.visibility,
       createdAt: new Date(p.createdAt),
@@ -474,10 +503,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
     };
 
     // DAO ctx admits private DAO projects via upstream's ownerId===userId branch.
-    const fetchOrgProjects = async (orgAccountId: string): Promise<UpstreamProject[]> => {
+    const fetchOrgProjects = async (
+      orgAccountId: string,
+      organizationId?: string | null,
+    ): Promise<UpstreamProject[]> => {
       const cached = daoProjectsCache.get(orgAccountId);
       if (cached && cached.expiresAt > Date.now()) return cached.projects;
-      const ctx = proxyCtx(orgAccountId);
+      const ctx = proxyCtx(orgAccountId, null, organizationId);
       const out: UpstreamProject[] = [];
       let cursor: string | undefined;
       do {
@@ -498,14 +530,16 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
     const fetchOrgProjectsById = async (
       orgAccountId: string,
+      organizationId?: string | null,
     ): Promise<Map<string, UpstreamProject>> => {
-      const ps = await fetchOrgProjects(orgAccountId);
+      const ps = await fetchOrgProjects(orgAccountId, organizationId);
       return new Map(ps.map((p) => [p.id, p]));
     };
 
     const requireProjectInOrg = async (
       projectId: string,
       orgAccountId: string,
+      organizationId?: string | null,
     ): Promise<UpstreamProject> => {
       // Fast path: a warm cache already contains every project in this org (filtered upstream by
       // `organizationId`), so a hit implicitly satisfies the org check. Cache miss / stale falls
@@ -516,7 +550,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
         if (hit) return hit;
       }
       try {
-        const result = await plugins.projects(proxyCtx(orgAccountId)).getProject({ id: projectId });
+        // Use "admin" role so the upstream grants access regardless of ownerId — callers are
+        // already gated by our own admin/contributor middleware before reaching this point.
+        const result = await plugins
+          .projects(proxyCtx(orgAccountId, "admin", organizationId))
+          .getProject({ id: projectId });
         if (result.data.organizationId !== orgAccountId) {
           throw new ORPCError("NOT_FOUND", { message: "Project not found" });
         }
@@ -601,23 +639,61 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
       agency: {
         projects: {
-          list: builder.agency.projects.list.handler(async ({ context }) => {
-            const orgAccountId = await resolveOrgAccountId(context, context.reqHeaders);
+          list: builder.agency.projects.list.use(tryOrgAuth).handler(async ({ context }) => {
             if (!plugins.projects) return { data: [] };
+
+            const isSuperAdmin =
+              (context as any)?.user?.role === "admin" || (context as any)?.isSuperAdmin === true;
+
+            if (isSuperAdmin && authDb) {
+              const allOrgs = await authDb.listOrgs();
+              const orgResults = await Promise.all(
+                allOrgs.map(async (org) => {
+                  const daoAccountId = (org.metadata as any)?.daoAccountId as string | undefined;
+                  if (!daoAccountId) return [];
+                  const upstream = await fetchOrgProjects(daoAccountId, org.id);
+                  const projectIds = upstream.map((p) => p.id);
+                  const linkByProjectId = isNearnAvailable(daoAccountId)
+                    ? await getListingsForProjects(projectIds, "nearn", daoAccountId, db, {
+                        skipRefresh: true,
+                      })
+                    : new Map();
+                  return upstream.map((p) => {
+                    const link = linkByProjectId.get(p.id);
+                    return {
+                      ...toContractProject(p, link?.externalId ?? null, daoAccountId),
+                      nearnListing: link ? listingRowToNearnPayload(link) : null,
+                    };
+                  });
+                }),
+              );
+              const data = orgResults
+                .flat()
+                .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+              return { data };
+            }
+
+            const orgAccountId = await resolveOrgAccountId(context, context.reqHeaders);
+            const organizationId = (context as any).organizationId ?? null;
 
             const isContributor =
               (context as any)?.user?.role === "admin" ||
-              ["admin", "contributor"].includes((context as any)?.organization?.member?.role ?? "");
+              (context as any)?.isSuperAdmin === true ||
+              ["admin", "contributor"].includes((context as any)?.memberRole ?? "");
 
             const upstream: UpstreamProject[] = [];
             let cursor: string | undefined;
             do {
-              const result = await plugins.projects(proxyCtx(orgAccountId)).listProjects({
-                organizationId: orgAccountId,
-                ...(isContributor ? {} : { visibility: "public", status: "active" }),
-                limit: 100,
-                cursor,
-              });
+              const result = await plugins
+                .projects(
+                  proxyCtx(orgAccountId, (context as any).memberRole ?? null, organizationId),
+                )
+                .listProjects({
+                  organizationId: orgAccountId,
+                  ...(isContributor ? {} : { visibility: "public", status: "active" }),
+                  limit: 100,
+                  cursor,
+                });
               upstream.push(...result.data);
               cursor = result.meta.nextCursor ?? undefined;
             } while (cursor);
@@ -639,37 +715,70 @@ export default createPlugin.withPlugins<PluginsClient>()({
             return { data };
           }),
 
-          get: builder.agency.projects.get
-            .use(gates.contributor)
-            .handler(async ({ context, input }) => {
-              const orgAccountId = await resolveOrgAccountId(context, context.reqHeaders);
-              const upstreamMatch = (await fetchOrgProjects(orgAccountId)).find(
+          get: builder.agency.projects.get.use(tryOrgAuth).handler(async ({ context, input }) => {
+            const orgAccountId = await resolveOrgAccountId(context, context.reqHeaders);
+            const organizationId = (context as any).organizationId ?? null;
+            const isContributor =
+              (context.user as any)?.role === "admin" ||
+              (context as any)?.isSuperAdmin === true ||
+              ["admin", "contributor"].includes((context as any)?.memberRole ?? "");
+
+            let upstreamMatch: UpstreamProject | undefined;
+            if (isContributor) {
+              upstreamMatch = (await fetchOrgProjects(orgAccountId, organizationId)).find(
                 (p) => p.slug === input.slug,
               );
-              if (!upstreamMatch) {
-                throw new ORPCError("NOT_FOUND", { message: "Project not found" });
-              }
-              const link = await getListingForProject(upstreamMatch.id, "nearn", orgAccountId, db, {
-                skipRefresh: true,
-              });
+            } else {
+              if (!plugins.projects) return null as never;
+              const result = await plugins
+                .projects(
+                  proxyCtx(orgAccountId, (context as any).memberRole ?? null, organizationId),
+                )
+                .listProjects({
+                  organizationId: orgAccountId,
+                  visibility: "public",
+                  status: "active",
+                  limit: 100,
+                });
+              upstreamMatch = result.data.find((p) => p.slug === input.slug);
+            }
 
-              const contributorRows = await db
-                .select({
-                  id: contributors.id,
-                  name: contributors.name,
-                  nearAccountId: contributors.nearAccountId,
-                  role: projectContributors.role,
-                })
-                .from(projectContributors)
-                .innerJoin(contributors, eq(projectContributors.contributorId, contributors.id))
-                .where(eq(projectContributors.projectId, upstreamMatch.id))
-                .orderBy(desc(projectContributors.createdAt));
+            if (!upstreamMatch) {
+              throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+            }
 
+            if (!isContributor) {
               return {
-                project: toContractProject(upstreamMatch, link?.externalId ?? null, orgAccountId),
-                contributors: contributorRows,
+                project: {
+                  ...toContractProject(upstreamMatch, null, orgAccountId),
+                  description: null,
+                  nearnListingId: null,
+                },
+                contributors: null,
               };
-            }),
+            }
+
+            const link = await getListingForProject(upstreamMatch.id, "nearn", orgAccountId, db, {
+              skipRefresh: true,
+            });
+
+            const contributorRows = await db
+              .select({
+                id: contributors.id,
+                name: contributors.name,
+                nearAccountId: contributors.nearAccountId,
+                role: projectContributors.role,
+              })
+              .from(projectContributors)
+              .innerJoin(contributors, eq(projectContributors.contributorId, contributors.id))
+              .where(eq(projectContributors.projectId, upstreamMatch.id))
+              .orderBy(desc(projectContributors.createdAt));
+
+            return {
+              project: toContractProject(upstreamMatch, link?.externalId ?? null, orgAccountId),
+              contributors: contributorRows,
+            };
+          }),
 
           getBudget: builder.agency.projects.getBudget
             .use(gates.contributor)
@@ -683,9 +792,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
             .use(gates.contributor)
             .handler(async ({ context, input }) => {
               const orgAccountId = await resolveOrgAccountId(context, context.reqHeaders);
-              const ctx = proxyCtx(orgAccountId, (context as any).memberRole);
+              const ctx = proxyCtx(
+                orgAccountId,
+                (context as any).memberRole ?? null,
+                (context as any).organizationId ?? null,
+              );
               const created = await plugins.projects(ctx).createProject({
-                kind: "project",
+                kind: input.kind ?? "project",
                 title: input.title,
                 slug: input.slug,
                 description: input.description,
@@ -744,7 +857,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
             .use(gates.contributor)
             .handler(async ({ context, input }) => {
               const orgAccountId = await resolveOrgAccountId(context, context.reqHeaders);
-              const ctx = proxyCtx(orgAccountId, (context as any).memberRole);
+              const ctx = proxyCtx(
+                orgAccountId,
+                (context as any).memberRole ?? null,
+                (context as any).organizationId ?? null,
+              );
               const { id, nearnListingId: _nearnListingId, ...projectPatch } = input;
 
               const existing = await requireProjectInOrg(id, orgAccountId);
@@ -825,7 +942,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
               // converged by the re-run.
               await deleteProjectCascade(db, input.id);
               await plugins
-                .projects(proxyCtx(orgAccountId, (context as any).memberRole))
+                .projects(
+                  proxyCtx(
+                    orgAccountId,
+                    (context as any).memberRole ?? null,
+                    (context as any).organizationId ?? null,
+                  ),
+                )
                 .deleteProject({ id: input.id });
               invalidateOrgProjects(orgAccountId);
               return { deleted: true as const };
@@ -916,7 +1039,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
       },
 
       contributors: {
-        list: builder.contributors.list.use(gates.contributor).handler(async () => {
+        list: builder.contributors.list.use(gates.contributor).handler(async ({ context }) => {
+          const isSuperAdmin =
+            (context as any)?.user?.role === "admin" || (context as any)?.isSuperAdmin === true;
+          if (isSuperAdmin) {
+            const rows = await db.select().from(contributors).orderBy(desc(contributors.updatedAt));
+            return { data: rows };
+          }
           const rows = await db.select().from(contributors).orderBy(desc(contributors.updatedAt));
           return { data: rows };
         }),
@@ -1025,12 +1154,29 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
       budgets: {
         list: builder.budgets.list.use(gates.contributor).handler(async ({ context, input }) => {
+          const isSuperAdmin =
+            (context as any)?.user?.role === "admin" || (context as any)?.isSuperAdmin === true;
+          if (isSuperAdmin && !input.projectId) {
+            return listBudgets(db, {
+              projectIds: null,
+              tokenId: input.tokenId,
+              cursor: input.cursor,
+              limit: input.limit,
+            });
+          }
           const orgId = await resolveOrgAccountId(context, context.reqHeaders);
           // Validate projectId is in-DAO upfront — explicit 404 over silent empty.
-          if (input.projectId) await requireProjectInOrg(input.projectId, orgId);
+          if (input.projectId)
+            await requireProjectInOrg(
+              input.projectId,
+              orgId,
+              (context as any).organizationId ?? null,
+            );
           const projectIds = input.projectId
             ? [input.projectId]
-            : (await fetchOrgProjects(orgId)).map((p) => p.id);
+            : (await fetchOrgProjects(orgId, (context as any).organizationId ?? null)).map(
+                (p) => p.id,
+              );
           return listBudgets(db, {
             projectIds,
             tokenId: input.tokenId,
@@ -1105,22 +1251,56 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
       billings: {
         list: builder.billings.list.use(gates.contributor).handler(async ({ context, input }) => {
+          const isSuperAdmin =
+            (context as any)?.user?.role === "admin" || (context as any)?.isSuperAdmin === true;
+
+          const selectBillingCols = {
+            id: billings.id,
+            projectId: billings.projectId,
+            contributorId: billings.contributorId,
+            tokenId: billings.tokenId,
+            amount: billings.amount,
+            proposalId: billings.proposalId,
+            note: billings.note,
+            createdAt: billings.createdAt,
+          } as const;
+
+          if (isSuperAdmin && !input.projectId) {
+            const rows = await db
+              .select(selectBillingCols)
+              .from(billings)
+              .where(
+                and(
+                  input.contributorId ? eq(billings.contributorId, input.contributorId) : undefined,
+                  cursorWhere(billings.createdAt, billings.id, input.cursor),
+                ),
+              )
+              .orderBy(desc(billings.createdAt), desc(billings.id))
+              .limit(input.limit);
+            const last = rows[rows.length - 1];
+            const orgId = await resolveOrgAccountId(context, context.reqHeaders);
+            const enriched = await Promise.all(rows.map((b) => enrichWithChainStatus(b, orgId)));
+            return {
+              data: enriched,
+              nextCursor:
+                rows.length === input.limit && last ? cursorOf(last.createdAt, last.id) : null,
+            };
+          }
+
           const orgId = await resolveOrgAccountId(context, context.reqHeaders);
-          if (input.projectId) await requireProjectInOrg(input.projectId, orgId);
+          if (input.projectId)
+            await requireProjectInOrg(
+              input.projectId,
+              orgId,
+              (context as any).organizationId ?? null,
+            );
           const projectIds = input.projectId
             ? [input.projectId]
-            : (await fetchOrgProjects(orgId)).map((p) => p.id);
+            : (await fetchOrgProjects(orgId, (context as any).organizationId ?? null)).map(
+                (p) => p.id,
+              );
           const rows = await db
-            .select({
-              id: billings.id,
-              projectId: billings.projectId,
-              contributorId: billings.contributorId,
-              tokenId: billings.tokenId,
-              amount: billings.amount,
-              proposalId: billings.proposalId,
-              note: billings.note,
-              createdAt: billings.createdAt,
-            })
+            .select(selectBillingCols)
             .from(billings)
             .where(
               and(

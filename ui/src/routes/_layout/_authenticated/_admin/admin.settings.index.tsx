@@ -160,8 +160,8 @@ function SettingsForm({
                 {data.orgAccountId}
               </div>
               <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                row identity — resolved from{" "}
-                <code>AGENCY_ORG_ACCOUNT_{data.network.toUpperCase()}</code> env var.
+                row identity — resolved from org metadata, settings table, or{" "}
+                <code>AGENCY_ORG_ACCOUNT_{data.network.toUpperCase()}</code> fallback.
               </p>
             </div>
             <form.Field name="daoAccountId">

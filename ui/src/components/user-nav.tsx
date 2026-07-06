@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { nearProfileOptions, useAuthClient } from "@/app";
+import { useAuthClient } from "@/app";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,12 @@ import { getNetwork, setNetwork } from "@/lib/network";
 import { meRolesQueryKey, meRolesQueryOptions } from "@/lib/queries";
 
 type Network = "mainnet" | "testnet";
+
+type NearProfile = {
+  name?: string;
+  description?: string;
+  image?: { url?: string; ipfs_cid?: string };
+};
 
 class NetworkMismatchError extends Error {
   readonly account: string;
@@ -63,7 +69,17 @@ export function UserNav() {
 
   const { data: session } = useQuery(sessionQueryOptions(authClient));
   const user = session?.user;
-  const { data: profile } = useQuery(nearProfileOptions(authClient));
+  const nearAccountId = authClient.near.getAccountId();
+  const { data: profile } = useQuery({
+    queryKey: ["me", "near-profile", nearAccountId ?? null] as const,
+    queryFn: async () => {
+      const res = await authClient.near.getProfile();
+      return (res?.data ?? null) as NearProfile | null;
+    },
+    enabled: !!nearAccountId,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
   const { data: roles } = useQuery({ ...meRolesQueryOptions(apiClient), enabled: !!user });
   const isAdmin = roles?.isAdmin ?? false;
   const isSuperAdmin = roles?.isSuperAdmin ?? false;
@@ -129,11 +145,7 @@ export function UserNav() {
       await authClient.near.disconnect().catch(() => {});
     },
     onSuccess: async () => {
-      queryClient.setQueryData(sessionQueryKey, null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: sessionQueryKey }),
-        queryClient.invalidateQueries({ queryKey: meRolesQueryKey }),
-      ]);
+      queryClient.clear();
       navigate({ to: "/", replace: true });
     },
     onError: (error: Error) => {
@@ -186,7 +198,11 @@ export function UserNav() {
           )}
           {isSuperAdmin && (
             <DropdownMenuItem asChild>
-              <Link to="/admin/platform" className="font-mono text-xs uppercase tracking-wide">
+              <Link
+                to="/admin/platform"
+                search={{ prefillSlug: undefined, prefillDaoAccountId: undefined }}
+                className="font-mono text-xs uppercase tracking-wide"
+              >
                 platform
               </Link>
             </DropdownMenuItem>

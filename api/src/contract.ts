@@ -5,6 +5,7 @@ import { z } from "every-plugin/zod";
 const applicationKind = z.enum(["founder", "contributor", "client"]);
 
 const projectStatus = z.enum(["active", "paused", "archived"]);
+const projectKind = z.enum(["project", "idea"]);
 const visibility = z.enum(["public", "unlisted", "private"]);
 const onboardingStatus = z.enum(["pending", "complete", "expired"]);
 const proposalStatus = z.enum([
@@ -77,6 +78,7 @@ const project = z.object({
   description: z.string().nullable(),
   repository: z.string().nullable(),
   nearnListingId: z.string().nullable(),
+  kind: projectKind,
   status: projectStatus,
   visibility,
   createdAt: z.date(),
@@ -324,22 +326,24 @@ export const contract = oc.router({
         .output(z.object({ data: z.array(projectWithNearn) })),
 
       get: oc
-        .route({ method: "GET", path: "/admin/projects/{slug}" })
+        .route({ method: "GET", path: "/projects/{slug}" })
         .input(z.object({ slug }))
         .output(
           z.object({
             project,
-            contributors: z.array(
-              z.object({
-                id: z.string(),
-                name: z.string(),
-                nearAccountId: z.string().nullable(),
-                role: z.string().nullable(),
-              }),
-            ),
+            contributors: z
+              .array(
+                z.object({
+                  id: z.string(),
+                  name: z.string(),
+                  nearAccountId: z.string().nullable(),
+                  role: z.string().nullable(),
+                }),
+              )
+              .nullable(),
           }),
         )
-        .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+        .errors({ NOT_FOUND }),
 
       getBudget: oc
         .route({ method: "GET", path: "/admin/projects/{projectId}/budget" })
@@ -356,6 +360,7 @@ export const contract = oc.router({
             description: z.string().max(16000).optional(),
             repository: httpUrl.optional(),
             nearnListingId: z.string().max(200).optional(),
+            kind: projectKind.default("project"),
             status: projectStatus.default("active"),
             visibility: visibility.default("private"),
           }),

@@ -111,7 +111,8 @@ function AdminProjectDetail() {
   }
   if (!projectQuery.data) throw notFound();
 
-  const { project, contributors } = projectQuery.data;
+  const { project, contributors: contributorsRaw } = projectQuery.data;
+  const contributors = contributorsRaw ?? [];
   const nearnUrl = project.nearnListingId ? nearnListingUrl(project.nearnListingId) : null;
 
   return (

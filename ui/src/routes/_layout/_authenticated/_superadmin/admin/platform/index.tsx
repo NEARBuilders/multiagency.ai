@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button, Card, CardContent, Input, Spinner } from "@/components";
 import { useApiClient } from "@/lib/api";
@@ -8,6 +8,11 @@ import { useApiClient } from "@/lib/api";
 export const Route = createFileRoute("/_layout/_authenticated/_superadmin/admin/platform/")({
   head: () => ({
     meta: [{ title: "Platform | Admin" }],
+  }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    prefillSlug: typeof search.prefillSlug === "string" ? search.prefillSlug : undefined,
+    prefillDaoAccountId:
+      typeof search.prefillDaoAccountId === "string" ? search.prefillDaoAccountId : undefined,
   }),
   component: PlatformPage,
 });
@@ -30,9 +35,16 @@ const LABEL_CLS = "font-mono text-[11px] uppercase tracking-[0.18em] text-muted-
 function PlatformPage() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
+  const { prefillSlug, prefillDaoAccountId } = useSearch({
+    from: "/_layout/_authenticated/_superadmin/admin/platform/",
+  });
   const [showCreateOrg, setShowCreateOrg] = useState(false);
   const [editingOrgId, setEditingOrgId] = useState<string | null>(null);
   const [confirmDeleteOrgId, setConfirmDeleteOrgId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (prefillSlug || prefillDaoAccountId) setShowCreateOrg(true);
+  }, [prefillSlug, prefillDaoAccountId]);
 
   const orgsQuery = useQuery({
     queryKey: ["platform", "orgs"],
@@ -77,6 +89,8 @@ function PlatformPage() {
 
         {showCreateOrg && (
           <OrgForm
+            initialSlug={prefillSlug}
+            initialDaoAccountId={prefillDaoAccountId}
             onDone={() => {
               queryClient.invalidateQueries({ queryKey: ["platform", "orgs"] });
               setShowCreateOrg(false);
@@ -176,21 +190,25 @@ function PlatformPage() {
 function OrgForm({
   org,
   onDone,
+  initialSlug,
+  initialDaoAccountId,
 }: {
   org?: { id: string; name: string; slug: string; metadata: Record<string, unknown> | null };
   onDone: () => void;
+  initialSlug?: string;
+  initialDaoAccountId?: string;
 }) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const isEdit = !!org;
 
   const [name, setName] = useState(org?.name ?? "");
-  const [slug, setSlug] = useState(org?.slug ?? "");
+  const [slug, setSlug] = useState(org?.slug ?? initialSlug ?? "");
   const [type, setType] = useState<"agency" | "client">(
     ((org?.metadata as any)?.type as "agency" | "client") ?? "client",
   );
   const [daoAccountId, setDaoAccountId] = useState(
-    String((org?.metadata as any)?.daoAccountId ?? ""),
+    String((org?.metadata as any)?.daoAccountId ?? initialDaoAccountId ?? ""),
   );
   const [adminNearId, setAdminNearId] = useState("");
 

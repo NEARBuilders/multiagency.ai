@@ -26,5 +26,10 @@
         "FASTNEAR_API_KEY"
       ]
     }
+  },
+  "plugins": {
+    "projects": {
+      "production": "https://elliot-braem-5165-everything-dev-projects-plugin--53e34cd79-ze.zephyrcloud.app"
+    }
   }
 }
