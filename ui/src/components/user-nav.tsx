@@ -37,17 +37,20 @@ function networkOf(accountId: string): Network {
   return accountId.endsWith(".testnet") ? "testnet" : "mainnet";
 }
 
-// Refetch session with a tight retry — defends against any window between signIn.near()
-// resolving and the session cookie being readable. better-near-auth's promise should
-// already wait for the cookie, but the cost of one extra round-trip is small insurance.
+// Wait for the session to be committed after signIn.near(), then return the linked NEAR account.
+// better-near-auth's signIn promise resolves before the session cookie is always readable —
+// this loop absorbs the lag. Uses near.getAccountId() so we get the actual NEAR account ID
+// (e.g. "alice.near") rather than user.name (display name) or user.id (UUID).
 async function readFreshSessionAccount(
   authClient: ReturnType<typeof useAuthClient>,
 ): Promise<string | null> {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 8; attempt++) {
     const { data } = await authClient.getSession();
-    const account = data?.user?.name ?? data?.user?.id ?? null;
-    if (account) return account;
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (data?.user?.id) {
+      const nearAccountId = authClient.near.getAccountId();
+      if (nearAccountId) return nearAccountId;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
   }
   return null;
 }
@@ -63,6 +66,7 @@ export function UserNav() {
   const { data: profile } = useQuery(nearProfileOptions(authClient));
   const { data: roles } = useQuery({ ...meRolesQueryOptions(apiClient), enabled: !!user });
   const isAdmin = roles?.isAdmin ?? false;
+  const isSuperAdmin = roles?.isSuperAdmin ?? false;
   const avatarUrl =
     profile?.image?.url ??
     (profile?.image?.ipfs_cid ? `https://ipfs.io/ipfs/${profile.image.ipfs_cid}` : null);
@@ -76,7 +80,9 @@ export function UserNav() {
       // Refetch session with a short retry to defend against any cookie-commit window.
       const account = await readFreshSessionAccount(authClient);
       if (!account) {
-        throw new Error("Sign-in returned no NEAR account on the session");
+        throw new Error(
+          "Sign-in completed but no NEAR account was found on the session. Try again — if the issue persists, check that the auth server is running and your wallet is connected.",
+        );
       }
       const dashboardNetwork = getNetwork();
       const walletNetwork = networkOf(account);
@@ -175,6 +181,13 @@ export function UserNav() {
             <DropdownMenuItem asChild>
               <Link to="/admin/settings" className="font-mono text-xs uppercase tracking-wide">
                 settings
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {isSuperAdmin && (
+            <DropdownMenuItem asChild>
+              <Link to="/admin/platform" className="font-mono text-xs uppercase tracking-wide">
+                platform
               </Link>
             </DropdownMenuItem>
           )}

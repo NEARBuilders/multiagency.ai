@@ -20,7 +20,7 @@ export function AdminError({ error }: { error: unknown }) {
         <Badge variant="outline">{isAccess ? "access denied" : "could not load"}</Badge>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           {isAccess
-            ? "Your NEAR account isn't authorized for this surface."
+            ? message || "You don't have access to this surface."
             : "We couldn't load this data. Try again, or check the API logs if this keeps happening."}
         </p>
         {!isAccess && message && (

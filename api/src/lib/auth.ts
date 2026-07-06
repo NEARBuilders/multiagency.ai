@@ -8,7 +8,9 @@ export type ApiKeyContext = NonNullable<GeneratedAuthRequestContext["apiKey"]>;
 export interface RequestAuthContext {
   userId?: GeneratedAuthRequestContext["userId"];
   user?: GeneratedAuthRequestContext["user"];
-  organizationId?: GeneratedAuthRequestContext["organization"]["activeOrganizationId"];
+  organizationId?: string | null;
+  memberRole?: string | null;
+  nearAccountId?: string | null;
   apiKey?: GeneratedAuthRequestContext["apiKey"];
   reqHeaders?: Headers;
   getRawBody?: () => Promise<string>;
@@ -41,6 +43,8 @@ function toRequestAuthContext(context: RequestAuthContext): RequestAuthContext {
     userId: context.userId,
     user: context.user,
     organizationId: context.organizationId,
+    memberRole: context.memberRole,
+    nearAccountId: context.nearAccountId,
     apiKey: context.apiKey,
     reqHeaders: context.reqHeaders,
     getRawBody: context.getRawBody,
@@ -92,7 +96,7 @@ export function createAuthMiddleware(builder: any) {
           data: { authType: "session", hint: "Sign in to continue" },
         });
       }
-      const currentRole = context.user.role;
+      const currentRole = context.memberRole;
       if (!currentRole || !roles.includes(currentRole)) {
         throw new ORPCError("FORBIDDEN", {
           message: `Requires role: ${roles.join(" or ")}`,

@@ -231,7 +231,7 @@ function ProjectCreateForm({
 
   const createMutation = useMutation({
     mutationFn: async () =>
-      apiClient.agency.projects.adminCreate({
+      apiClient.agency.projects.create({
         slug: slug.trim(),
         title: title.trim(),
         description: description.trim() || undefined,
@@ -363,7 +363,7 @@ function ProjectEditForm({ project }: { project: Project }) {
 
   const updateMutation = useMutation({
     mutationFn: async () =>
-      apiClient.agency.projects.adminUpdate({
+      apiClient.agency.projects.update({
         id: project.id,
         title: title.trim(),
         description: description.trim() || null,
@@ -477,7 +477,7 @@ function AssignmentsSection({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const assignmentsQuery = useQuery({
     queryKey: ["admin", "assignments", projectId],
-    queryFn: () => apiClient.assignments.adminList({ projectId }),
+    queryFn: () => apiClient.assignments.list({ projectId }),
   });
   const contributorsQuery = useQuery(adminContributorsListQueryOptions(apiClient));
 
@@ -486,7 +486,7 @@ function AssignmentsSection({ projectId }: { projectId: string }) {
 
   const addMutation = useMutation({
     mutationFn: async () =>
-      apiClient.assignments.adminCreate({
+      apiClient.assignments.create({
         projectId,
         contributorId,
         role: role.trim() || undefined,
@@ -502,7 +502,7 @@ function AssignmentsSection({ projectId }: { projectId: string }) {
 
   const removeMutation = useMutation({
     mutationFn: async (cid: string) =>
-      apiClient.assignments.adminDelete({ projectId, contributorId: cid }),
+      apiClient.assignments.delete({ projectId, contributorId: cid }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "assignments", projectId] });
       toast.success("Contributor unassigned");
