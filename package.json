@@ -37,7 +37,7 @@
       "@orpc/contract": "1.14.3",
       "@better-auth/api-key": "1.6.9",
       "@better-auth/passkey": "1.6.9",
-      "everything-dev": "^1.38.0",
+      "everything-dev": "^1.40.0",
       "@scure/base": "^2.2.0",
       "pg": "^8.12.0",
       "@types/pg": "^8.11.6",
@@ -104,7 +104,7 @@
     "dotenv": "^17.3.1",
     "tsx": "^4.21.0",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^catalog:",
+    "vitest": "catalog:",
     "@changesets/cli": "^2.29.8"
   },
   "dependencies": {
