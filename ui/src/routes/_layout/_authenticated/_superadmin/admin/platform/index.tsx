@@ -178,7 +178,7 @@ function PlatformOrganizationsPage() {
   );
 }
 
-function OrgProjectsTab({ orgId, orgSlug }: { orgId: string; orgSlug: string }) {
+function OrgProjectsTab({ orgId }: { orgId: string }) {
   const apiClient = useApiClient();
   const projectsQuery = useQuery({
     queryKey: ["platform", "projects"],
@@ -192,15 +192,8 @@ function OrgProjectsTab({ orgId, orgSlug }: { orgId: string; orgSlug: string }) 
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-          {projects.length} project{projects.length === 1 ? "" : "s"}
-        </div>
-        <a href={orgSiteUrl(orgSlug)} target="_blank" rel="noreferrer">
-          <Button size="sm" variant="outline">
-            view org →
-          </Button>
-        </a>
+      <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+        {projects.length} project{projects.length === 1 ? "" : "s"}
       </div>
 
       {projects.length === 0 ? (
@@ -208,10 +201,96 @@ function OrgProjectsTab({ orgId, orgSlug }: { orgId: string; orgSlug: string }) 
       ) : (
         <div className="space-y-2">
           {projects.map((project: PlatformProject) => (
-            <ProjectRow key={project.id} project={project} orgSlug={orgSlug} />
+            <ProjectRow key={project.id} project={project} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function OrgMembersTab({
+  orgId,
+  onMembersChanged,
+}: {
+  orgId: string;
+  onMembersChanged: () => void;
+}) {
+  const apiClient = useApiClient();
+  type OrgRole = "admin" | "contributor" | "client";
+
+  const membersQuery = useQuery({
+    queryKey: ["platform", "orgs", orgId, "members"],
+    queryFn: () => apiClient.platform.listOrgMembers({ orgId }),
+  });
+
+  const [pendingRoles, setPendingRoles] = useState<Record<string, OrgRole>>({});
+
+  useEffect(() => {
+    if (!membersQuery.data) return;
+    setPendingRoles(
+      Object.fromEntries(
+        membersQuery.data.map((member) => [member.id, member.role as OrgRole]),
+      ) as Record<string, OrgRole>,
+    );
+  }, [membersQuery.data]);
+
+  const dirtyMembers =
+    membersQuery.data?.filter((member) => pendingRoles[member.id] !== member.role) ?? [];
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(
+        dirtyMembers.map((member) =>
+          apiClient.platform.updateOrgMember({
+            orgId,
+            memberId: member.id,
+            role: pendingRoles[member.id],
+          }),
+        ),
+      );
+    },
+    onSuccess: () => {
+      toast.success("Member roles updated");
+      onMembersChanged();
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to update member roles"),
+  });
+
+  if (membersQuery.isLoading) return <Spinner />;
+
+  const members = membersQuery.data ?? [];
+
+  return (
+    <div className="space-y-6">
+      <AddMemberForm orgId={orgId} onAdded={onMembersChanged} />
+
+      {members.length === 0 ? (
+        <p className="font-mono text-sm text-muted-foreground">No members yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {members.map((member) => (
+            <PlatformMemberRow
+              key={member.id}
+              member={member}
+              pendingRole={pendingRoles[member.id] ?? (member.role as OrgRole)}
+              onPendingRoleChange={(role) =>
+                setPendingRoles((current) => ({ ...current, [member.id]: role }))
+              }
+              onRemoved={onMembersChanged}
+              orgId={orgId}
+            />
+          ))}
+        </div>
+      )}
+
+      <Button
+        onClick={() => saveMutation.mutate()}
+        disabled={dirtyMembers.length === 0 || saveMutation.isPending}
+        className="font-display uppercase tracking-wide"
+      >
+        {saveMutation.isPending ? "saving…" : "save changes →"}
+      </Button>
     </div>
   );
 }
@@ -234,19 +313,10 @@ function OrgForm({
 
   const [name, setName] = useState(org?.name ?? "");
   const [slug, setSlug] = useState(org?.slug ?? initialSlug ?? "");
-  const [type, setType] = useState<"agency" | "client">(
-    ((org?.metadata as { type?: "agency" | "client" })?.type as "agency" | "client") ?? "client",
-  );
   const [daoAccountId, setDaoAccountId] = useState(
     String((org?.metadata as { daoAccountId?: string })?.daoAccountId ?? initialDaoAccountId ?? ""),
   );
   const [adminNearId, setAdminNearId] = useState("");
-
-  const membersQuery = useQuery({
-    queryKey: ["platform", "orgs", org?.id, "members"],
-    queryFn: () => apiClient.platform.listOrgMembers({ orgId: org!.id }),
-    enabled: isEdit && editTab === "members",
-  });
 
   const slugFromName = (n: string) =>
     n
@@ -261,12 +331,10 @@ function OrgForm({
             orgId: org.id,
             name: name.trim() || undefined,
             daoAccountId: daoAccountId.trim() || undefined,
-            type: type || undefined,
           })
         : apiClient.platform.createOrg({
             name: name.trim(),
             slug: slug.trim(),
-            type,
             daoAccountId: daoAccountId.trim(),
             adminNearId: adminNearId.trim(),
           }),
@@ -322,21 +390,6 @@ function OrgForm({
           />
         </div>
       )}
-      <div className="space-y-1">
-        <label htmlFor="org-type" className={LABEL_CLS}>
-          type
-        </label>
-        <select
-          id="org-type"
-          value={type}
-          onChange={(e) => setType(e.target.value as "agency" | "client")}
-          disabled={mutation.isPending}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 font-mono text-xs"
-        >
-          <option value="client">client</option>
-          <option value="agency">agency</option>
-        </select>
-      </div>
       <div className="space-y-1">
         <label htmlFor="org-dao-account" className={LABEL_CLS}>
           sputnik dao account
@@ -402,37 +455,17 @@ function OrgForm({
             )}
 
             {editTab === "members" && (
-              <div className="space-y-3">
-                <AddMemberForm
-                  orgId={org.id}
-                  onAdded={() =>
-                    queryClient.invalidateQueries({
-                      queryKey: ["platform", "orgs", org.id, "members"],
-                    })
-                  }
-                />
-                {membersQuery.isLoading && <Spinner />}
-                {membersQuery.data?.length === 0 && (
-                  <p className="font-mono text-sm text-muted-foreground">No members yet.</p>
-                )}
-                <div className="space-y-2">
-                  {membersQuery.data?.map((member) => (
-                    <MemberRow
-                      key={member.id}
-                      member={member}
-                      orgId={org.id}
-                      onChanged={() =>
-                        queryClient.invalidateQueries({
-                          queryKey: ["platform", "orgs", org.id, "members"],
-                        })
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
+              <OrgMembersTab
+                orgId={org.id}
+                onMembersChanged={() =>
+                  queryClient.invalidateQueries({
+                    queryKey: ["platform", "orgs", org.id, "members"],
+                  })
+                }
+              />
             )}
 
-            {editTab === "projects" && <OrgProjectsTab orgId={org.id} orgSlug={org.slug} />}
+            {editTab === "projects" && <OrgProjectsTab orgId={org.id} />}
           </div>
         ) : (
           <>
@@ -468,83 +501,68 @@ function AddMemberForm({ orgId, onAdded }: { orgId: string; onAdded: () => void 
   });
 
   return (
-    <div className="flex items-end gap-2">
-      <div className="flex-1 space-y-1">
-        <label htmlFor="add-org-member-near-id" className={LABEL_CLS}>
-          near account id
-        </label>
-        <Input
-          id="add-org-member-near-id"
-          value={nearAccountId}
-          onChange={(e) => setNearAccountId(e.target.value)}
-          placeholder="alice.near"
-          disabled={addMutation.isPending}
-        />
-      </div>
-      <div className="space-y-1">
-        <label htmlFor="add-org-member-role" className={LABEL_CLS}>
-          role
-        </label>
-        <select
-          id="add-org-member-role"
-          value={role}
-          onChange={(e) => setRole(e.target.value as typeof role)}
-          disabled={addMutation.isPending}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 font-mono text-xs"
-        >
-          <option value="admin">admin</option>
-          <option value="contributor">contributor</option>
-          <option value="client">client</option>
-        </select>
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label htmlFor="add-org-member-near-id" className={LABEL_CLS}>
+            near account id
+          </label>
+          <Input
+            id="add-org-member-near-id"
+            value={nearAccountId}
+            onChange={(e) => setNearAccountId(e.target.value)}
+            placeholder="alice.near"
+            disabled={addMutation.isPending}
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="add-org-member-role" className={LABEL_CLS}>
+            role
+          </label>
+          <select
+            id="add-org-member-role"
+            value={role}
+            onChange={(e) => setRole(e.target.value as typeof role)}
+            disabled={addMutation.isPending}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 font-mono text-xs"
+          >
+            <option value="admin">admin</option>
+            <option value="contributor">contributor</option>
+            <option value="client">client</option>
+          </select>
+        </div>
       </div>
       <Button
-        size="sm"
         onClick={() => addMutation.mutate()}
         disabled={!nearAccountId.trim() || addMutation.isPending}
+        className="font-display uppercase tracking-wide"
       >
-        {addMutation.isPending ? "adding…" : "add →"}
+        {addMutation.isPending ? "adding…" : "add member →"}
       </Button>
     </div>
   );
 }
 
-export function MemberRow({
+function PlatformMemberRow({
   member,
   orgId,
-  onChanged,
-  isPlatform = true,
+  pendingRole,
+  onPendingRoleChange,
+  onRemoved,
 }: {
   member: Member;
   orgId: string;
-  onChanged: () => void;
-  isPlatform?: boolean;
+  pendingRole: "admin" | "contributor" | "client";
+  onPendingRoleChange: (role: "admin" | "contributor" | "client") => void;
+  onRemoved: () => void;
 }) {
   const apiClient = useApiClient();
-  const [pendingRole, setPendingRole] = useState<"admin" | "contributor" | "client">(
-    member.role as "admin" | "contributor" | "client",
-  );
-  const isDirty = pendingRole !== member.role;
-
-  const updateMutation = useMutation({
-    mutationFn: () =>
-      isPlatform
-        ? apiClient.platform.updateOrgMember({ orgId, memberId: member.id, role: pendingRole })
-        : apiClient.members.updateRole({ memberId: member.id, role: pendingRole }),
-    onSuccess: () => {
-      toast.success("Role updated");
-      onChanged();
-    },
-    onError: (e: Error) => toast.error(e.message || "Failed to update role"),
-  });
 
   const removeMutation = useMutation({
-    mutationFn: () =>
-      isPlatform
-        ? apiClient.platform.removeOrgMember({ orgId, memberId: member.id })
-        : apiClient.members.remove({ memberId: member.id }),
+    mutationFn: () => apiClient.platform.removeOrgMember({ orgId, memberId: member.id }),
     onSuccess: () => {
       toast.success("Member removed");
-      onChanged();
+      onRemoved();
     },
     onError: (e: Error) => toast.error(e.message || "Failed to remove member"),
   });
@@ -562,29 +580,19 @@ export function MemberRow({
         </span>
         <select
           value={pendingRole}
-          onChange={(e) => setPendingRole(e.target.value as typeof pendingRole)}
-          disabled={updateMutation.isPending || removeMutation.isPending}
+          onChange={(e) => onPendingRoleChange(e.target.value as typeof pendingRole)}
+          disabled={removeMutation.isPending}
           className="h-7 rounded border border-input bg-background px-2 font-mono text-[11px]"
         >
           <option value="admin">admin</option>
           <option value="contributor">contributor</option>
           <option value="client">client</option>
         </select>
-        {isDirty && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => updateMutation.mutate()}
-            disabled={updateMutation.isPending}
-          >
-            {updateMutation.isPending ? "…" : "save"}
-          </Button>
-        )}
         <Button
           size="sm"
           variant="destructive"
           onClick={() => removeMutation.mutate()}
-          disabled={removeMutation.isPending || updateMutation.isPending}
+          disabled={removeMutation.isPending}
         >
           {removeMutation.isPending ? "…" : "remove"}
         </Button>

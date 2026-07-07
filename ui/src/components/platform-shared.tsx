@@ -1,4 +1,4 @@
-import { Badge, Button, Card, CardContent } from "@/components";
+import { Badge, Card, CardContent } from "@/components";
 
 export type PlatformProject = {
   id: string;
@@ -22,7 +22,7 @@ export function orgSiteUrl(slug: string) {
   return `http://${slug}.localhost:3000/work`;
 }
 
-export function ProjectRow({ project, orgSlug }: { project: PlatformProject; orgSlug: string }) {
+export function ProjectRow({ project }: { project: PlatformProject }) {
   return (
     <Card>
       <CardContent className="p-3 flex flex-wrap items-center gap-3">
@@ -41,11 +41,6 @@ export function ProjectRow({ project, orgSlug }: { project: PlatformProject; org
         <Badge variant="outline" className="font-mono text-[10px] uppercase">
           {project.visibility}
         </Badge>
-        <a href={orgSiteUrl(orgSlug)} target="_blank" rel="noreferrer">
-          <Button size="sm" variant="ghost">
-            view org →
-          </Button>
-        </a>
       </CardContent>
     </Card>
   );

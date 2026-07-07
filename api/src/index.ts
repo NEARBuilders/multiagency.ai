@@ -1883,7 +1883,6 @@ export default createPlugin.withPlugins<PluginsClient>()({
                 message: `No account found for "${input.adminNearId}". They need to sign in to the platform at least once before being added as admin.`,
               });
             const metadata: Record<string, unknown> = {};
-            if (input.type) metadata.type = input.type;
             if (input.daoAccountId) metadata.daoAccountId = input.daoAccountId;
             const org = await authDb.createOrg({
               name: input.name,
@@ -1914,7 +1913,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           const existing = (await authDb.listOrgs()).find((o) => o.id === input.orgId);
           if (!existing) throw new ORPCError("NOT_FOUND", { message: "Organization not found" });
           const newMetadata = { ...(existing.metadata ?? {}) };
-          if (input.type !== undefined) newMetadata.type = input.type;
+          delete newMetadata.type;
           if (input.daoAccountId !== undefined) newMetadata.daoAccountId = input.daoAccountId;
           const updated = await authDb.updateOrg(input.orgId, {
             name: input.name,
