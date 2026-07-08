@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAuthClient } from "@/app";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -69,6 +68,7 @@ export function UserNav() {
 
   const { data: session } = useQuery(sessionQueryOptions(authClient));
   const user = session?.user;
+  const activeNetwork = authClient.useActiveNetwork();
   const nearAccountId = authClient.near.getAccountId();
   const { data: profile } = useQuery({
     queryKey: ["me", "near-profile", nearAccountId ?? null] as const,
@@ -154,7 +154,7 @@ export function UserNav() {
   });
 
   if (!user) {
-    return <ConnectButton connect={connectMutation} />;
+    return <ConnectButton connect={connectMutation} network={activeNetwork} />;
   }
 
   const identifier = user.name || user.email || user.id;
@@ -225,25 +225,22 @@ export function UserNav() {
   );
 }
 
-// Pre-connect button. Tells the user which network they're about to authenticate against —
-// reduces the wallet-network-mismatch toast we'd otherwise show reactively. getNetwork reads
-// URL+cookie (client-only), so we render the bare label first then upgrade on mount.
-function ConnectButton({ connect }: { connect: { mutate: () => void; isPending: boolean } }) {
-  // Local `setNetwork` shadows the imported auth helper, intentionally — the import only fires
-  // from the outer UserNav mutation, never inside this component. Keeping the natural name.
-  const [network, setNetwork] = useState<Network | null>(null);
-  useEffect(() => setNetwork(getNetwork()), []);
-  const label = connect.isPending ? "connecting..." : network ? `connect · ${network}` : "connect";
+function ConnectButton({
+  connect,
+  network,
+}: {
+  connect: { mutate: () => void; isPending: boolean };
+  network: string | null;
+}) {
+  const label = connect.isPending ? "connecting..." : "connect";
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => connect.mutate()}
-        disabled={connect.isPending}
-      >
-        {label}
-      </Button>
-    </div>
+    <Button
+      variant="outline"
+      className="px-3 py-1.5 text-xs font-medium rounded-md"
+      onClick={() => connect.mutate()}
+      disabled={connect.isPending}
+    >
+      {label}
+    </Button>
   );
 }

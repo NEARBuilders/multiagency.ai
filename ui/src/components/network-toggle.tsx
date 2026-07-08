@@ -1,11 +1,15 @@
+import { useQuery } from "@tanstack/react-query";
 import { Globe } from "lucide-react";
 import { useAuthClient } from "@/app";
+import { sessionQueryOptions } from "@/lib/auth";
 
 export function NetworkToggle() {
   const auth = useAuthClient();
+  const { data: session } = useQuery(sessionQueryOptions(auth));
   const supportedNetworks = auth.near.getSupportedNetworks();
   const currentNetwork = auth.useActiveNetwork();
 
+  if (session?.user) return null;
   if (supportedNetworks.length <= 1) return null;
 
   return (
