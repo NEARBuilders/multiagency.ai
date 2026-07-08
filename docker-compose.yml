@@ -25,14 +25,14 @@ services:
 
   postgres-auth:
     <<: *pg-common
-    container_name: multiagentic.near-postgres-auth
+    container_name: auth.everything.near-postgres-auth
     environment:
       <<: *pg-env
       POSTGRES_DB: auth_db
     ports:
       - "5433:5432"
     volumes:
-      - multiagentic_near_postgres_auth_data:/var/lib/postgresql/data
+      - auth_everything_near_postgres_auth_data:/var/lib/postgresql/data
 
   postgres-projects:
     <<: *pg-common
@@ -48,7 +48,7 @@ services:
 volumes:
   multiagentic_near_postgres_api_data:
     name: multiagentic_near_postgres_api_data
-  multiagentic_near_postgres_auth_data:
-    name: multiagentic_near_postgres_auth_data
+  auth_everything_near_postgres_auth_data:
+    name: auth_everything_near_postgres_auth_data
   multiagentic_near_postgres_projects_data:
     name: multiagentic_near_postgres_projects_data
