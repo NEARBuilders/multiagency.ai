@@ -157,11 +157,10 @@ function SettingsForm({
             <div className="space-y-2">
               <div className={LABEL_CLS}>agency account</div>
               <div className="font-mono text-sm break-all px-3 py-2 border border-border bg-muted/30">
-                {data.orgAccountId}
+                {data.orgAccountId ?? "—"}
               </div>
               <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                row identity — resolved from org metadata, settings table, or{" "}
-                <code>AGENCY_ORG_ACCOUNT_{data.network.toUpperCase()}</code> fallback.
+                row identity — set when the agency org was created.
               </p>
             </div>
             <form.Field name="daoAccountId">

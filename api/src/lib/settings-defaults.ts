@@ -1,4 +1,4 @@
-import { defaultOrgAccount, type Network } from "./default-org-account";
+import type { Network } from "./default-org-account";
 
 export const HARDCODED_NAME = "MultiAgency";
 export const HARDCODED_HEADLINE = "Open Books · Open Source · Open Doors";
@@ -40,6 +40,6 @@ export function defaultPublicSettings(network: Network) {
     nearnAccountId: defaultNearnAccountId(),
     websiteUrl: defaultWebsiteUrl(),
     docsUrl: defaultDocsUrl(),
-    orgAccountId: defaultOrgAccount(network),
+    orgAccountId: null as string | null,
   };
 }

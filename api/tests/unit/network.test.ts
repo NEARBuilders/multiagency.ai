@@ -3,8 +3,7 @@ import { getNetwork } from "../../src/lib/network";
 
 const ENV_KEYS = [
   "NEAR_NETWORK",
-  "AGENCY_ORG_ACCOUNT_MAINNET",
-  "AGENCY_ORG_ACCOUNT_TESTNET",
+  "AGENCY_DAO_ACCOUNT",
 ] as const;
 
 const saved: Record<string, string | undefined> = {};

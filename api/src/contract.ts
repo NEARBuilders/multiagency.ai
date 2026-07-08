@@ -833,7 +833,7 @@ export const contract = oc.router({
         nearnAccountId: z.string().nullable(),
         websiteUrl: z.string().nullable(),
         docsUrl: z.string().nullable(),
-        orgAccountId: z.string(),
+        orgAccountId: z.string().nullable(),
         network: z.enum(["mainnet", "testnet"]),
         networkPinned: z.boolean(),
       }),
@@ -843,7 +843,7 @@ export const contract = oc.router({
       .route({ method: "GET", path: "/admin/settings" })
       .output(
         z.object({
-          orgAccountId: z.string(),
+          orgAccountId: z.string().nullable(),
           network: z.enum(["mainnet", "testnet"]),
           // Editable for admins of this deployment — resolved DB → env → hardcoded.
           editable: z.object({

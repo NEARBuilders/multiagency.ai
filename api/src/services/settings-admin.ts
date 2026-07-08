@@ -31,13 +31,13 @@ export async function getSettingsRow(db: Database, orgAccountId: string) {
 export async function getResolvedPublicSettings(
   db: Database,
   network: Network,
-  orgAccountId: string,
 ) {
-  const row = await getSettingsRow(db, orgAccountId);
+  const row = await db.query.settings.findFirst();
+  const resolvedOrgId = row?.orgAccountId ?? null;
   const base = defaultPublicSettings(network);
   return {
     ...base,
-    orgAccountId,
+    orgAccountId: resolvedOrgId,
     daoAccountId: row?.daoAccountId ?? null,
     nearnAccountId: row?.nearnAccountId ?? defaultNearnAccountId(),
     websiteUrl: row?.websiteUrl ?? defaultWebsiteUrl(),

@@ -10,7 +10,7 @@ import { loadMigrations } from "./db/load-migrations";
 import { migrate } from "./db/migrator";
 import { applications, billings, budgets, contributors, projectContributors } from "./db/schema";
 import { createAuthMiddleware } from "./lib/auth";
-import { defaultOrgAccount, pinnedNetwork } from "./lib/default-org-account";
+import { pinnedNetwork } from "./lib/default-org-account";
 import { getNetwork } from "./lib/network";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import {
@@ -222,7 +222,9 @@ export default createPlugin.withPlugins<PluginsClient>()({
       const meta = context.organization?.organization?.metadata as Record<string, unknown> | undefined;
       const fromMeta = meta?.daoAccountId;
       if (typeof fromMeta === "string" && fromMeta.length > 0) return fromMeta;
-      return defaultOrgAccount(getNetwork(context.reqHeaders as Headers | undefined));
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "No DAO account configured. A platform admin must create an agency org.",
+      });
     };
 
     
@@ -1677,8 +1679,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       agencyConfig: {
         getPublic: builder.agencyConfig.getPublic.handler(async ({ context }) => {
           const network = getNetwork(context.reqHeaders);
-          const settingsKey = getDaoAccountId(context);
-          const resolved = await getResolvedPublicSettings(db, network, settingsKey);
+          const resolved = await getResolvedPublicSettings(db, network);
           return {
             ...resolved,
             network,
@@ -1688,12 +1689,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
         get: builder.agencyConfig.get.use(gates.admin).handler(async ({ context }) => {
           const network = getNetwork(context.reqHeaders);
-          const settingsKey = getDaoAccountId(context);
-          const orgAccountId = await getDaoAccountId(context);
-          const row = await getSettingsRow(db, settingsKey);
+          const daoAccountId = getDaoAccountId(context);
+          const row = await getSettingsRow(db, daoAccountId);
           const base = defaultPublicSettings(network);
           return {
-            orgAccountId,
+            orgAccountId: row?.orgAccountId ?? daoAccountId,
             network,
             editable: {
               daoAccountId: row?.daoAccountId ?? null,
