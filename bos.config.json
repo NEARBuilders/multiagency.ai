@@ -1,6 +1,6 @@
 {
   "extends": "bos://dev.everything.near/dev.everything.dev",
-  "account": "work.efiz.near",
+  "account": "multiagentic.near",
   "domain": "dev.multiagency.ai",
   "title": "MultiAgency",
   "description": "Human-led, AI-native agencies for hire.",
@@ -33,8 +33,8 @@
         },
         "siwn": {
           "recipients": {
-            "mainnet": "multiagentic.near",
-            "testnet": "multiagentic.testnet"
+            "mainnet": "multiagency.sputnik-dao.near",
+            "testnet": "multiagency.sputnikv2.testnet"
           }
         }
       }
