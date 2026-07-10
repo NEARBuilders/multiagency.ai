@@ -1,21 +1,13 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { Effect } from "every-plugin/effect";
-import { ORPCError } from "every-plugin/orpc";
-import { z } from "every-plugin/zod";
+import type { z } from "every-plugin/zod";
+import type { proposalPublicItem } from "../contract";
 import type { Database } from "../db";
 import { billings } from "../db/schema";
 import type { AgencyService } from "./agency";
-import {
-  getDaoTokenIds,
-  getLastProposalId,
-  getProposal,
-  getProposals,
-  networkOf,
-  type DaoProposal,
-} from "./sputnik";
+import { type DaoProposal, getLastProposalId, getProposals } from "./sputnik";
 import { summarizeProposals } from "./summaries";
 import { NATIVE_TOKEN_ID } from "./tokens";
-import { proposalPublicItem } from "../contract";
 
 const PROPOSAL_FETCH_PAGE_SIZE = 100;
 const PROPOSAL_FETCH_MAX_ITERATIONS = 5;
@@ -37,11 +29,7 @@ async function fetchTransferProposals(
   const transfers: DaoProposal[] = [];
   let cursor = fromIndex ?? lastProposalId;
   let iterations = 0;
-  while (
-    transfers.length < limit &&
-    cursor > 0 &&
-    iterations < PROPOSAL_FETCH_MAX_ITERATIONS
-  ) {
+  while (transfers.length < limit && cursor > 0 && iterations < PROPOSAL_FETCH_MAX_ITERATIONS) {
     const startIndex = Math.max(0, cursor - PROPOSAL_FETCH_PAGE_SIZE);
     const fetched = await getProposals(db, orgAccountId, startIndex, cursor - startIndex);
     for (const p of fetched.slice().reverse()) {
@@ -60,20 +48,14 @@ async function fetchTransferProposals(
   };
 }
 
-function toProposalPublicItem(
-  p: DaoProposal,
-): z.infer<typeof proposalPublicItem> {
+function toProposalPublicItem(p: DaoProposal): z.infer<typeof proposalPublicItem> {
   const transfer = p.kind.type === "Transfer" ? p.kind : null;
   return {
     proposalId: String(p.id),
     proposer: p.proposer,
     description: p.description,
     status: p.status,
-    tokenId: transfer
-      ? transfer.tokenId === ""
-        ? NATIVE_TOKEN_ID
-        : transfer.tokenId
-      : "",
+    tokenId: transfer ? (transfer.tokenId === "" ? NATIVE_TOKEN_ID : transfer.tokenId) : "",
     receiverId: transfer?.receiverId ?? "",
     amount: transfer?.amount ?? "0",
     submissionTime: p.submissionTime,
@@ -159,18 +141,11 @@ export function createProposalsService(db: Database, agency: AgencyService) {
       Effect.gen(function* () {
         const orgAccountId = yield* agency.getDaoAccountId(context);
         try {
-          const lastProposalId = yield* Effect.promise(() =>
-            getLastProposalId(orgAccountId),
-          );
+          const lastProposalId = yield* Effect.promise(() => getLastProposalId(orgAccountId));
           if (lastProposalId === 0) return summarizeProposals([], 0);
           const pageSize = Math.min(100, lastProposalId);
           const recent = yield* Effect.promise(() =>
-            getProposals(
-              db,
-              orgAccountId,
-              Math.max(0, lastProposalId - pageSize),
-              pageSize,
-            ),
+            getProposals(db, orgAccountId, Math.max(0, lastProposalId - pageSize), pageSize),
           );
           return summarizeProposals(recent, lastProposalId);
         } catch {

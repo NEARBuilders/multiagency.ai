@@ -4,8 +4,8 @@ import { ORPCError } from "every-plugin/orpc";
 import type { Database } from "../db";
 import { cursorOf, cursorWhere } from "../db/cursor";
 import { applications } from "../db/schema";
+import { type NotifyConfig, notifyNewApplication } from "./notify";
 import { defaultContactEmail } from "./settings-admin";
-import { notifyNewApplication, type NotifyConfig } from "./notify";
 
 export function createApplicationsService(db: Database, notifyConfig: NotifyConfig) {
   return {
@@ -96,7 +96,9 @@ export function createApplicationsService(db: Database, notifyConfig: NotifyConf
         );
         const row = result[0];
         if (!row) {
-          return yield* Effect.fail(new ORPCError("NOT_FOUND", { message: "Application not found" }));
+          return yield* Effect.fail(
+            new ORPCError("NOT_FOUND", { message: "Application not found" }),
+          );
         }
         return { application: row };
       }),

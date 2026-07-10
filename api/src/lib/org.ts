@@ -17,7 +17,9 @@ function extractDaoAccountId(context: {
   });
 }
 
-export function getDaoAccountId(context: Parameters<typeof extractDaoAccountId>[0]): Effect.Effect<string, ORPCError<string, unknown>> {
+export function getDaoAccountId(
+  context: Parameters<typeof extractDaoAccountId>[0],
+): Effect.Effect<string, ORPCError<string, unknown>> {
   return Effect.try({
     try: () => extractDaoAccountId(context),
     catch: (err) => err as ORPCError<string, unknown>,

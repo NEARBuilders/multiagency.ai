@@ -1,7 +1,7 @@
 import { Effect } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
-import { fetchWithTimeout } from "./fetch";
 import { getDaoAccountId } from "../lib/org";
+import { fetchWithTimeout } from "./fetch";
 import { defaultNearnAccountId } from "./settings-admin";
 
 const NEARN_BASE_URL = "https://nearn.io";
@@ -360,9 +360,7 @@ export function createNearnService() {
         if (!sponsorSlug) {
           return { sponsorSlug: null, bounties: [] };
         }
-        const bounties = yield* Effect.promise(() =>
-          listNearnBountiesForSponsor(sponsorSlug),
-        );
+        const bounties = yield* Effect.promise(() => listNearnBountiesForSponsor(sponsorSlug));
         return { sponsorSlug, bounties };
       }),
 
@@ -377,9 +375,7 @@ export function createNearnService() {
           );
         }
         try {
-          const submissions = yield* Effect.promise(() =>
-            getNearnListingSubmissions(input.slug),
-          );
+          const submissions = yield* Effect.promise(() => getNearnListingSubmissions(input.slug));
           return { submissions };
         } catch (err) {
           const message = (err as Error).message ?? "";

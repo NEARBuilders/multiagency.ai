@@ -44,7 +44,7 @@ function MembersPage() {
     queryFn: async () => {
       if (!activeOrgId) return [];
       const res = (await authClient.organization.listMembers({ query: { limit: 100 } })) as any;
-      const raw = Array.isArray(res) ? res : res?.members ?? res?.data ?? [];
+      const raw = Array.isArray(res) ? res : (res?.members ?? res?.data ?? []);
       return raw.map((m: any) => ({
         id: m.id,
         userId: m.userId,
@@ -93,14 +93,23 @@ function MembersPage() {
         <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
           invite member
         </div>
-        <AddMemberForm onAdded={invalidate} authClient={authClient} orgId={activeOrgId ?? undefined} />
+        <AddMemberForm
+          onAdded={invalidate}
+          authClient={authClient}
+          orgId={activeOrgId ?? undefined}
+        />
       </section>
 
       <section className="space-y-3">
         <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
           current members ({members.length})
         </div>
-        <MembersTable members={members} onChanged={invalidate} authClient={authClient} orgId={activeOrgId ?? undefined} />
+        <MembersTable
+          members={members}
+          onChanged={invalidate}
+          authClient={authClient}
+          orgId={activeOrgId ?? undefined}
+        />
       </section>
     </div>
   );

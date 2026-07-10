@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Effect } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
 import type { Database } from "../db";
@@ -14,14 +14,12 @@ import {
   NearnListingConflictError,
   setListingsArchived,
 } from "./listings";
+import { isNearnAvailable } from "./nearn";
 import { deleteProjectCascade } from "./projects";
 import { resolveActiveListing, rollupForToken } from "./rollups";
 import { enrichWithChainStatus, networkOf } from "./sputnik";
-import { isNearnAvailable } from "./nearn";
 
 const DAO_PROJECTS_TTL_MS = 5_000;
-
-type OrgMetadata = { daoAccountId?: string; type?: "agency" | "client" };
 
 type UpstreamProject = {
   id: string;
@@ -83,10 +81,7 @@ async function fetchOrgProjectsPaginated(
 }
 
 export function createAgencyService(db: Database, plugins: PluginsClient) {
-  const daoProjectsCache = new Map<
-    string,
-    { projects: UpstreamProject[]; expiresAt: number }
-  >();
+  const daoProjectsCache = new Map<string, { projects: UpstreamProject[]; expiresAt: number }>();
 
   function invalidateOrgProjects(orgAccountId: string): void {
     daoProjectsCache.delete(orgAccountId);
@@ -155,8 +150,7 @@ export function createAgencyService(db: Database, plugins: PluginsClient) {
       Effect.gen(function* () {
         const orgAccountId = yield* getDaoAccountId(context);
         const memberRole = (context as any).organization?.member?.role as string | undefined;
-        const isContributor =
-          memberRole === "admin" || memberRole === "contributor";
+        const isContributor = memberRole === "admin" || memberRole === "contributor";
 
         const upstream = yield* Effect.promise(() =>
           isContributor
@@ -195,8 +189,7 @@ export function createAgencyService(db: Database, plugins: PluginsClient) {
       Effect.gen(function* () {
         const orgAccountId = yield* getDaoAccountId(context);
         const memberRole = (context as any).organization?.member?.role as string | undefined;
-        const isContributor =
-          memberRole === "admin" || memberRole === "contributor";
+        const isContributor = memberRole === "admin" || memberRole === "contributor";
 
         let upstreamMatch: UpstreamProject | undefined;
         if (isContributor) {
@@ -343,12 +336,10 @@ export function createAgencyService(db: Database, plugins: PluginsClient) {
 
         const final: UpstreamProject = yield* Effect.promise(async () => {
           if (input.status && input.status !== (created as any).status) {
-            return (await plugins
-              .projects(context)
-              .updateProject({
-                id: (created as any).id,
-                status: input.status as any,
-              })) as unknown as UpstreamProject;
+            return (await plugins.projects(context).updateProject({
+              id: (created as any).id,
+              status: input.status as any,
+            })) as unknown as UpstreamProject;
           }
           return created as unknown as UpstreamProject;
         });
@@ -420,8 +411,7 @@ export function createAgencyService(db: Database, plugins: PluginsClient) {
 
         const upstreamPatch: Record<string, unknown> = {
           ...projectPatch,
-          description:
-            projectPatch.description === null ? "" : projectPatch.description,
+          description: projectPatch.description === null ? "" : projectPatch.description,
         };
 
         const updated: UpstreamProject = hasProjectChanges
@@ -498,9 +488,7 @@ export function createAgencyService(db: Database, plugins: PluginsClient) {
         yield* Effect.promise(() => requireProjectInOrg(input.id, orgAccountId, context));
 
         yield* Effect.promise(() => deleteProjectCascade(db, input.id));
-        yield* Effect.promise(() =>
-          plugins.projects(context).deleteProject({ id: input.id }),
-        );
+        yield* Effect.promise(() => plugins.projects(context).deleteProject({ id: input.id }));
         invalidateOrgProjects(orgAccountId);
         return { deleted: true as const };
       }),

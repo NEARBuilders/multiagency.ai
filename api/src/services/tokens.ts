@@ -186,11 +186,11 @@ export function displayToBaseUnits(decimalString: string, decimals: number): big
 }
 
 import { Effect } from "every-plugin/effect";
-import { getDaoTokenIds, getFtMetadata, getStorageBalance, networkOf } from "./sputnik";
-import { getDaoAccountId } from "../lib/org";
 import type { Database } from "../db";
+import { getDaoAccountId } from "../lib/org";
+import { getDaoTokenIds, getFtMetadata, getStorageBalance, networkOf } from "./sputnik";
 
-export function createTokensService(db: Database) {
+export function createTokensService(_db: Database) {
   return {
     list: (context: Record<string, unknown>) =>
       Effect.gen(function* () {
@@ -202,9 +202,7 @@ export function createTokensService(db: Database) {
             ids.map(async (id) => {
               if (id === NATIVE_TOKEN_ID) {
                 const native = getTokenMetadata(id);
-                return native
-                  ? { ...native, chainNetwork: orgNetwork }
-                  : null;
+                return native ? { ...native, chainNetwork: orgNetwork } : null;
               }
               const known = getTokenMetadata(id);
               if (known && known.chainNetwork === orgNetwork) return known;
@@ -224,24 +222,18 @@ export function createTokensService(db: Database) {
         );
         return {
           tokens: resolved.filter(
-            (t): t is KnownToken & { chainNetwork: "mainnet" | "testnet" } =>
-              t !== null,
+            (t): t is KnownToken & { chainNetwork: "mainnet" | "testnet" } => t !== null,
           ),
         };
       }),
 
-    getStorageStatus: (
-      context: Record<string, unknown>,
-      input: { tokenId: string },
-    ) =>
+    getStorageStatus: (context: Record<string, unknown>, input: { tokenId: string }) =>
       Effect.gen(function* () {
         const orgAccountId = yield* getDaoAccountId(context);
         if (input.tokenId === NATIVE_TOKEN_ID) {
           return { tokenId: input.tokenId, status: null };
         }
-        const status = yield* Effect.promise(() =>
-          getStorageBalance(orgAccountId, input.tokenId),
-        );
+        const status = yield* Effect.promise(() => getStorageBalance(orgAccountId, input.tokenId));
         return { tokenId: input.tokenId, status };
       }),
   };

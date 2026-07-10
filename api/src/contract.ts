@@ -804,7 +804,6 @@ export const contract = oc.router({
         ),
       }),
     ),
-
   },
 
   agencyConfig: {

@@ -60,11 +60,7 @@ export function createContributorsService(db: Database) {
           if (v !== undefined) updates[k] = v;
         }
         const result = yield* Effect.promise(() =>
-          db
-            .update(contributors)
-            .set(updates)
-            .where(eq(contributors.id, id))
-            .returning(),
+          db.update(contributors).set(updates).where(eq(contributors.id, id)).returning(),
         );
         const row = result[0];
         if (!row) {

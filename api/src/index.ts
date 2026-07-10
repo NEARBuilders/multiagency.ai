@@ -7,23 +7,28 @@ import { createDatabaseDriver } from "./db";
 import { loadMigrations } from "./db/load-migrations";
 import { migrate } from "./db/migrator";
 import { createAuthMiddleware } from "./lib/auth";
+import { ContextSchema, runEffect } from "./lib/context";
 import { getNetwork, pinnedNetwork } from "./lib/network";
+import { getDaoAccountIdOrThrow } from "./lib/org";
 import type { PluginsClient } from "./lib/plugins-types.gen";
-import { runEffect, ContextSchema } from "./lib/context";
-import { createApplicationsService } from "./services/applications";
 import { createAgencyService } from "./services/agency";
-import { createListingsService } from "./services/listings";
-import { createContributorsService } from "./services/contributors";
+import { createApplicationsService } from "./services/applications";
 import { createAssignmentsService } from "./services/assignments";
-import { createBudgetsService } from "./services/budgets";
 import { createBillingsService } from "./services/billings";
+import { createBudgetsService } from "./services/budgets";
+import { createContributorsService } from "./services/contributors";
+import { createListingsService } from "./services/listings";
+import { createNearnService } from "./services/nearn";
 import { createProposalsService } from "./services/proposals";
+import {
+  defaultPublicSettings,
+  getResolvedPublicSettings,
+  getSettingsRow,
+  upsertSettings,
+} from "./services/settings-admin";
+import { getRoles } from "./services/sputnik";
 import { createTokensService } from "./services/tokens";
 import { createTreasuryService } from "./services/treasury";
-import { createNearnService } from "./services/nearn";
-import { getRoles } from "./services/sputnik";
-import { getResolvedPublicSettings, getSettingsRow, upsertSettings, defaultPublicSettings } from "./services/settings-admin";
-import { getDaoAccountIdOrThrow } from "./lib/org";
 
 export default createPlugin.withPlugins<PluginsClient>()({
   variables: z.object({}),
@@ -119,21 +124,15 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
           create: builder.agency.projects.create
             .use(auth.requireOrgRole("admin", "owner", "member"))
-            .handler(async ({ context, input }) =>
-              runEffect(agency.createProject(context, input)),
-            ),
+            .handler(async ({ context, input }) => runEffect(agency.createProject(context, input))),
 
           update: builder.agency.projects.update
             .use(auth.requireOrgRole("admin", "owner", "member"))
-            .handler(async ({ context, input }) =>
-              runEffect(agency.updateProject(context, input)),
-            ),
+            .handler(async ({ context, input }) => runEffect(agency.updateProject(context, input))),
 
           delete: builder.agency.projects.delete
             .use(auth.requireOrgRole("admin", "owner"))
-            .handler(async ({ context, input }) =>
-              runEffect(agency.deleteProject(context, input)),
-            ),
+            .handler(async ({ context, input }) => runEffect(agency.deleteProject(context, input))),
         },
 
         listings: {
@@ -146,12 +145,9 @@ export default createPlugin.withPlugins<PluginsClient>()({
                   agency.requireProjectInOrg(input.projectId, orgId, context),
                 ).pipe(
                   Effect.andThen(() =>
-                    listings.getListingForProject(
-                      input.projectId,
-                      "internal",
-                      orgId,
-                      { skipRefresh: true },
-                    ),
+                    listings.getListingForProject(input.projectId, "internal", orgId, {
+                      skipRefresh: true,
+                    }),
                   ),
                   Effect.map((listing) => ({ listing })),
                 ),
@@ -284,9 +280,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
             const orgId = getDaoAccountIdOrThrow(context);
             if (input.projectId)
               await runEffect(
-                Effect.promise(() =>
-                  agency.requireProjectInOrg(input.projectId!, orgId, context),
-                ),
+                Effect.promise(() => agency.requireProjectInOrg(input.projectId!, orgId, context)),
               );
             return runEffect(
               Effect.promise(() =>
@@ -305,14 +299,17 @@ export default createPlugin.withPlugins<PluginsClient>()({
           .handler(async ({ context, input }) => {
             const orgId = getDaoAccountIdOrThrow(context);
             await agency.requireProjectInOrg(input.projectId, orgId, context);
-            const actorId = (context.near?.primaryAccountId as string) ?? context.userId ?? "unknown";
-            const budget = await runEffect(budgets.create({
-              projectId: input.projectId,
-              tokenId: input.tokenId,
-              amount: input.amount,
-              note: input.note ?? null,
-              actorAccountId: actorId,
-            }) as any);
+            const actorId =
+              (context.near?.primaryAccountId as string) ?? context.userId ?? "unknown";
+            const budget = await runEffect(
+              budgets.create({
+                projectId: input.projectId,
+                tokenId: input.tokenId,
+                amount: input.amount,
+                note: input.note ?? null,
+                actorAccountId: actorId,
+              }) as any,
+            );
             return { budget } as any;
           }),
 
@@ -321,14 +318,17 @@ export default createPlugin.withPlugins<PluginsClient>()({
           .handler(async ({ context, input }) => {
             const orgId = getDaoAccountIdOrThrow(context);
             await agency.requireProjectInOrg(input.projectId, orgId, context);
-            const actorId = (context.near?.primaryAccountId as string) ?? context.userId ?? "unknown";
-            const budget = await runEffect(budgets.deallocate({
-              projectId: input.projectId,
-              tokenId: input.tokenId,
-              amount: input.amount,
-              note: input.note ?? null,
-              actorAccountId: actorId,
-            }) as any);
+            const actorId =
+              (context.near?.primaryAccountId as string) ?? context.userId ?? "unknown";
+            const budget = await runEffect(
+              budgets.deallocate({
+                projectId: input.projectId,
+                tokenId: input.tokenId,
+                amount: input.amount,
+                note: input.note ?? null,
+                actorAccountId: actorId,
+              }) as any,
+            );
             return { budget } as any;
           }),
 
@@ -338,15 +338,18 @@ export default createPlugin.withPlugins<PluginsClient>()({
             const orgId = getDaoAccountIdOrThrow(context);
             await agency.requireProjectInOrg(input.fromProjectId, orgId, context);
             await agency.requireProjectInOrg(input.toProjectId, orgId, context);
-            const actorId = (context.near?.primaryAccountId as string) ?? context.userId ?? "unknown";
-            const result = await runEffect(budgets.transfer({
-              fromProjectId: input.fromProjectId,
-              toProjectId: input.toProjectId,
-              tokenId: input.tokenId,
-              amount: input.amount,
-              note: input.note ?? null,
-              actorAccountId: actorId,
-            }) as any);
+            const actorId =
+              (context.near?.primaryAccountId as string) ?? context.userId ?? "unknown";
+            const result = await runEffect(
+              budgets.transfer({
+                fromProjectId: input.fromProjectId,
+                toProjectId: input.toProjectId,
+                tokenId: input.tokenId,
+                amount: input.amount,
+                note: input.note ?? null,
+                actorAccountId: actorId,
+              }) as any,
+            );
             return result as any;
           }),
       },
@@ -356,27 +359,21 @@ export default createPlugin.withPlugins<PluginsClient>()({
           .use(auth.requireOrgRole("admin", "owner", "member"))
           .handler(async ({ context, input }) => {
             const orgId = getDaoAccountIdOrThrow(context);
-            return runEffect(
-              billings.list(input, orgId, context),
-            );
+            return runEffect(billings.list(input, orgId, context));
           }),
 
         create: builder.billings.create
           .use(auth.requireOrgRole("admin", "owner"))
           .handler(async ({ context, input }) => {
             const orgId = getDaoAccountIdOrThrow(context);
-            return runEffect(
-              billings.create(input, orgId, context),
-            );
+            return runEffect(billings.create(input, orgId, context));
           }),
 
         delete: builder.billings.delete
           .use(auth.requireOrgRole("admin", "owner"))
           .handler(async ({ context, input }) => {
             const orgId = getDaoAccountIdOrThrow(context);
-            return runEffect(
-              billings.delete(input, orgId, context),
-            );
+            return runEffect(billings.delete(input, orgId, context));
           }),
       },
 
@@ -393,27 +390,19 @@ export default createPlugin.withPlugins<PluginsClient>()({
       nearn: {
         getListing: builder.nearn.getListing
           .use(auth.requireOrgRole("admin", "owner", "member"))
-          .handler(async ({ context, input }) =>
-            runEffect(nearn.getListing(context, input)),
-          ),
+          .handler(async ({ context, input }) => runEffect(nearn.getListing(context, input))),
 
         listSponsorBounties: builder.nearn.listSponsorBounties
           .use(auth.requireOrgRole("admin", "owner", "member"))
-          .handler(async ({ context }) =>
-            runEffect(nearn.listSponsorBounties(context)),
-          ),
+          .handler(async ({ context }) => runEffect(nearn.listSponsorBounties(context))),
 
         listSubmissions: builder.nearn.listSubmissions
           .use(auth.requireOrgRole("admin", "owner", "member"))
-          .handler(async ({ context, input }) =>
-            runEffect(nearn.listSubmissions(context, input)),
-          ),
+          .handler(async ({ context, input }) => runEffect(nearn.listSubmissions(context, input))),
       },
 
       tokens: {
-        list: builder.tokens.list.handler(async ({ context }) =>
-          runEffect(tokens.list(context)),
-        ),
+        list: builder.tokens.list.handler(async ({ context }) => runEffect(tokens.list(context))),
 
         getStorageStatus: builder.tokens.getStorageStatus.handler(async ({ context, input }) =>
           runEffect(tokens.getStorageStatus(context, input)),
@@ -421,24 +410,20 @@ export default createPlugin.withPlugins<PluginsClient>()({
       },
 
       treasury: {
-        getPublicBalances: builder.treasury.getPublicBalances.handler(
-          async ({ context, input }) => runEffect(treasury.getPublicBalances(context, input)),
+        getPublicBalances: builder.treasury.getPublicBalances.handler(async ({ context, input }) =>
+          runEffect(treasury.getPublicBalances(context, input)),
         ),
 
         getBalances: builder.treasury.getBalances
           .use(auth.requireOrgRole("admin", "owner", "member"))
-          .handler(async ({ context, input }) =>
-            runEffect(treasury.getBalances(context, input)),
-          ),
+          .handler(async ({ context, input }) => runEffect(treasury.getBalances(context, input))),
 
         getRollups: builder.treasury.getRollups
           .use(auth.requireOrgRole("admin", "owner", "member"))
-          .handler(async ({ context }) =>
-            runEffect(treasury.getRollups(context)),
-          ),
+          .handler(async ({ context }) => runEffect(treasury.getRollups(context))),
 
-        getPublicSummary: builder.treasury.getPublicSummary.handler(
-          async ({ context }) => runEffect(treasury.getPublicSummary(context)),
+        getPublicSummary: builder.treasury.getPublicSummary.handler(async ({ context }) =>
+          runEffect(treasury.getPublicSummary(context)),
         ),
       },
 
@@ -477,8 +462,9 @@ export default createPlugin.withPlugins<PluginsClient>()({
           };
         }),
 
-        get: builder.agencyConfig.get.use(auth.requireOrgRole("admin", "owner")).handler(
-          async ({ context }) => {
+        get: builder.agencyConfig.get
+          .use(auth.requireOrgRole("admin", "owner"))
+          .handler(async ({ context }) => {
             const network = getNetwork(context.reqHeaders);
             const daoAccountId = getDaoAccountIdOrThrow(context);
             const row = await getSettingsRow(db, daoAccountId);
@@ -508,8 +494,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
                   }
                 : null,
             };
-          },
-        ),
+          }),
 
         update: builder.agencyConfig.update
           .use(auth.requireOrgRole("admin", "owner"))

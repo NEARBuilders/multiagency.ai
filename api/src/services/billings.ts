@@ -28,9 +28,9 @@ export function createBillingsService(db: Database, agency: AgencyService) {
         }
         const projectIds = input.projectId
           ? [input.projectId]
-          : (yield* Effect.promise(() =>
-              agency.fetchOrgProjects(orgAccountId, context),
-            )).map((p: { id: string }) => p.id);
+          : (yield* Effect.promise(() => agency.fetchOrgProjects(orgAccountId, context))).map(
+              (p: { id: string }) => p.id,
+            );
 
         const selectBillingCols = {
           id: billings.id,
@@ -50,9 +50,7 @@ export function createBillingsService(db: Database, agency: AgencyService) {
             .where(
               and(
                 inArray(billings.projectId, projectIds),
-                input.contributorId
-                  ? eq(billings.contributorId, input.contributorId)
-                  : undefined,
+                input.contributorId ? eq(billings.contributorId, input.contributorId) : undefined,
                 cursorWhere(billings.createdAt, billings.id, input.cursor),
               ),
             )
@@ -66,9 +64,7 @@ export function createBillingsService(db: Database, agency: AgencyService) {
         return {
           data: enriched,
           nextCursor:
-            rows.length === input.limit && last
-              ? cursorOf(last.createdAt, last.id)
-              : null,
+            rows.length === input.limit && last ? cursorOf(last.createdAt, last.id) : null,
         };
       }),
 
@@ -87,9 +83,7 @@ export function createBillingsService(db: Database, agency: AgencyService) {
           agency.fetchOrgProjectsById(orgAccountId, context),
         );
         if (!orgProjectsById.has(input.projectId)) {
-          return yield* Effect.fail(
-            new ORPCError("NOT_FOUND", { message: "Project not found" }),
-          );
+          return yield* Effect.fail(new ORPCError("NOT_FOUND", { message: "Project not found" }));
         }
 
         const proposalIdNum = Number.parseInt(input.proposalId, 10);
@@ -118,9 +112,7 @@ export function createBillingsService(db: Database, agency: AgencyService) {
           );
         }
 
-        const proposal = yield* Effect.promise(() =>
-          getProposal(db, orgAccountId, proposalIdNum),
-        );
+        const proposal = yield* Effect.promise(() => getProposal(db, orgAccountId, proposalIdNum));
         if (!proposal) {
           return yield* Effect.fail(
             new ORPCError("NOT_FOUND", {
@@ -164,10 +156,7 @@ export function createBillingsService(db: Database, agency: AgencyService) {
               id,
               projectId: input.projectId,
               contributorId,
-              tokenId:
-                transferKind.tokenId === ""
-                  ? NATIVE_TOKEN_ID
-                  : transferKind.tokenId,
+              tokenId: transferKind.tokenId === "" ? NATIVE_TOKEN_ID : transferKind.tokenId,
               amount: transferKind.amount,
               proposalId: input.proposalId,
               note: input.note ?? null,
@@ -181,9 +170,7 @@ export function createBillingsService(db: Database, agency: AgencyService) {
             new ORPCError("INTERNAL_SERVER_ERROR", { message: "Insert failed" }),
           );
         }
-        const enhanced = yield* Effect.promise(() =>
-          enrichWithChainStatus(db, row, orgAccountId),
-        );
+        const enhanced = yield* Effect.promise(() => enrichWithChainStatus(db, row, orgAccountId));
         return { billing: enhanced };
       }),
 
@@ -198,16 +185,12 @@ export function createBillingsService(db: Database, agency: AgencyService) {
         );
         const row = existing[0];
         if (!row) {
-          return yield* Effect.fail(
-            new ORPCError("NOT_FOUND", { message: "Billing not found" }),
-          );
+          return yield* Effect.fail(new ORPCError("NOT_FOUND", { message: "Billing not found" }));
         }
         yield* Effect.promise(() =>
           agency.requireProjectInOrg(row.projectId, orgAccountId, context),
         );
-        yield* Effect.promise(() =>
-          db.delete(billings).where(eq(billings.id, input.id)),
-        );
+        yield* Effect.promise(() => db.delete(billings).where(eq(billings.id, input.id)));
         return { deleted: true as const };
       }),
   };

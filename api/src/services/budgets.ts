@@ -3,11 +3,10 @@ import { Effect } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
 import type { Database } from "../db";
 import { cursorOf, cursorWhere } from "../db/cursor";
-import { type Budget, budgets } from "../db/schema";
-import { billings } from "../db/schema";
+import { type Budget, billings, budgets } from "../db/schema";
 import { getListingForProject } from "./listings";
-import { enrichWithChainStatus, networkOf } from "./sputnik";
 import { resolveActiveListing, rollupForToken } from "./rollups";
+import { enrichWithChainStatus, networkOf } from "./sputnik";
 
 export class BudgetInsufficientError extends Error {
   constructor(
@@ -236,14 +235,8 @@ export function createBudgetsService(db: Database) {
         getListingForProject(projectId, "nearn", orgId, db),
         getListingForProject(projectId, "internal", orgId, db),
       ]);
-      const bills = await Promise.all(
-        billsRaw.map((b) => enrichWithChainStatus(db, b, orgId)),
-      );
-      const resolved = resolveActiveListing(
-        nearnListing,
-        internalListing,
-        networkOf(orgId),
-      );
+      const bills = await Promise.all(billsRaw.map((b) => enrichWithChainStatus(db, b, orgId)));
+      const resolved = resolveActiveListing(nearnListing, internalListing, networkOf(orgId));
       const tokenIds = Array.from(
         new Set([
           ...budgetRows.map((b) => b.tokenId),

@@ -1,4 +1,4 @@
-name: multiagentic.near
+name: work.efiz.near
 
 x-pg-common: &pg-common
   image: postgres:17-alpine
@@ -14,14 +14,14 @@ x-pg-common: &pg-common
 services:
   postgres-api:
     <<: *pg-common
-    container_name: multiagentic.near-postgres-api
+    container_name: work.efiz.near-postgres-api
     environment:
       <<: *pg-env
       POSTGRES_DB: api_db
     ports:
       - "5432:5432"
     volumes:
-      - multiagentic_near_postgres_api_data:/var/lib/postgresql/data
+      - work_efiz_near_postgres_api_data:/var/lib/postgresql/data
 
   postgres-auth:
     <<: *pg-common
@@ -46,8 +46,8 @@ services:
       - work_efiz_near_postgres_projects_data:/var/lib/postgresql/data
 
 volumes:
-  multiagentic_near_postgres_api_data:
-    name: multiagentic_near_postgres_api_data
+  work_efiz_near_postgres_api_data:
+    name: work_efiz_near_postgres_api_data
   auth_everything_near_postgres_auth_data:
     name: auth_everything_near_postgres_auth_data
   work_efiz_near_postgres_projects_data:

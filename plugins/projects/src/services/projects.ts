@@ -389,12 +389,12 @@ export const ProjectServiceLive = Layer.effect(
 
     return {
       listProjects: (
-          input,
-          userId?: string,
-          alternateUserId?: string,
-          orgId?: string,
-          orgRole?: string,
-        ) =>
+        input,
+        userId?: string,
+        alternateUserId?: string,
+        orgId?: string,
+        orgRole?: string,
+      ) =>
         Effect.gen(function* () {
           const limit = Math.min(input.limit ?? 24, 100);
           const offset = input.cursor ? parseInt(input.cursor, 10) : 0;
@@ -497,7 +497,7 @@ export const ProjectServiceLive = Layer.effect(
           return yield* mapProjectDetail(db, project);
         }),
 
-      createProject: (input, userId, userRole, alternateUserId?, orgId?, orgRole?) =>
+      createProject: (input, userId, userRole, _alternateUserId?, _orgId?, orgRole?) =>
         Effect.gen(function* () {
           const canSetOwner = userRole === "admin" || orgRole === "admin";
           const effectiveOwnerId =
@@ -579,7 +579,15 @@ export const ProjectServiceLive = Layer.effect(
 
       updateProject: (id, input, userId, userRole, alternateUserId, orgId?, orgRole?) =>
         Effect.gen(function* () {
-          const canEdit = yield* canEditProject(db, id, userId, userRole, alternateUserId, orgId, orgRole);
+          const canEdit = yield* canEditProject(
+            db,
+            id,
+            userId,
+            userRole,
+            alternateUserId,
+            orgId,
+            orgRole,
+          );
           if (!canEdit) {
             return yield* Effect.fail(
               new ORPCError("FORBIDDEN", {
@@ -665,7 +673,15 @@ export const ProjectServiceLive = Layer.effect(
 
       deleteProject: (id, userId, userRole, alternateUserId, orgId?, orgRole?) =>
         Effect.gen(function* () {
-          const canEdit = yield* canEditProject(db, id, userId, userRole, alternateUserId, orgId, orgRole);
+          const canEdit = yield* canEditProject(
+            db,
+            id,
+            userId,
+            userRole,
+            alternateUserId,
+            orgId,
+            orgRole,
+          );
           if (!canEdit) {
             return yield* Effect.fail(
               new ORPCError("FORBIDDEN", {
@@ -699,9 +715,26 @@ export const ProjectServiceLive = Layer.effect(
           }));
         }),
 
-      linkAppToProject: (projectId, accountId, domain, userId, userRole, alternateUserId, orgId?, orgRole?) =>
+      linkAppToProject: (
+        projectId,
+        accountId,
+        domain,
+        userId,
+        userRole,
+        alternateUserId,
+        orgId?,
+        orgRole?,
+      ) =>
         Effect.gen(function* () {
-          const canEdit = yield* canEditProject(db, projectId, userId, userRole, alternateUserId, orgId, orgRole);
+          const canEdit = yield* canEditProject(
+            db,
+            projectId,
+            userId,
+            userRole,
+            alternateUserId,
+            orgId,
+            orgRole,
+          );
           if (!canEdit) {
             return yield* Effect.fail(
               new ORPCError("FORBIDDEN", {
@@ -770,7 +803,15 @@ export const ProjectServiceLive = Layer.effect(
         orgRole?: string,
       ) =>
         Effect.gen(function* () {
-          const canEdit = yield* canEditProject(db, projectId, userId, userRole, alternateUserId, orgId, orgRole);
+          const canEdit = yield* canEditProject(
+            db,
+            projectId,
+            userId,
+            userRole,
+            alternateUserId,
+            orgId,
+            orgRole,
+          );
           if (!canEdit) {
             return yield* Effect.fail(
               new ORPCError("FORBIDDEN", {
@@ -807,8 +848,7 @@ export const ProjectServiceLive = Layer.effect(
           const filtered = results.filter((r: any) => {
             if (r.project.visibility === "public" || r.project.visibility === "unlisted")
               return true;
-            if (orgRole && orgId && r.project.organizationId === orgId)
-              return true;
+            if (orgRole && orgId && r.project.organizationId === orgId) return true;
             if (isProjectOwner(r.project.ownerId, userId, alternateUserId)) return true;
             return false;
           });

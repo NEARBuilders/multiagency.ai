@@ -1,12 +1,11 @@
 import { createPlugin } from "every-plugin";
 import { Effect, Layer } from "every-plugin/effect";
-import { ORPCError } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
 import { contract } from "./contract";
 import { DatabaseLive } from "./db/layer";
-import { BuilderService, BuilderServiceLive } from "./services/builders";
-import { runEffect, ContextSchema } from "./lib/context";
 import { createAuthMiddleware } from "./lib/auth";
+import { ContextSchema, runEffect } from "./lib/context";
+import { BuilderService, BuilderServiceLive } from "./services/builders";
 
 export default createPlugin({
   variables: z.object({}),
@@ -53,8 +52,12 @@ export default createPlugin({
       getMyBuilderProfile: builder.getMyBuilderProfile
         .use(auth.requireAuth)
         .handler(async ({ context }) => {
+          const ctx = context as any;
           const result = await runEffect(
-            services.builder.getBuilderByUserId(context.userId, context.walletAddress),
+            services.builder.getBuilderByUserId(
+              ctx.userId,
+              ctx.near?.primaryAccountId ?? undefined,
+            ),
           );
           return { data: result };
         }),
@@ -67,13 +70,14 @@ export default createPlugin({
       updateBuilderProfile: builder.updateBuilderProfile
         .use(auth.requireAuth)
         .handler(async ({ input, context, errors }) => {
+          const ctx = context as any;
           const result = await runEffect(
             services.builder.updateBuilderProfile(
               input.nearAccount,
               input,
-              context.userId,
-              context.walletAddress,
-              context.user.role,
+              ctx.userId,
+              ctx.near?.primaryAccountId ?? undefined,
+              ctx.user?.role,
             ),
           );
           if (!result) {

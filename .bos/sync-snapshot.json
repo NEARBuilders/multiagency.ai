@@ -1,9 +1,9 @@
 {
   "parentRef": "bos://dev.everything.near/dev.everything.dev",
-  "timestamp": "2026-07-10T16:40:48.287Z",
+  "timestamp": "2026-07-10T18:39:38.156Z",
   "files": {
     ".env.example": "b685ac67248e76ed",
-    ".gitignore": "a1d4f7ec4d57a474",
+    ".gitignore": "782b7f7ebef97e72",
     "biome.json": "36ca7ffcbc5ef3ee",
     "bos.config.json": "96c007c9bc507d09",
     "bunfig.toml": "4cbe3ca05f990f5d",
@@ -31,9 +31,9 @@
     "api/rspack.config.js": "f6a0eca55d7e3ea6",
     "api/tsconfig.contract.json": "761dd89908ebe069",
     "api/tsconfig.json": "df633d8422169089",
-    "api/src/lib/auth.ts": "5886db4b9146a6d1",
+    "api/src/lib/auth.ts": "88d318e241a4d03c",
     "api/src/lib/context.ts": "3d8ef880cc2cf2a4",
-    "plugins/projects/src/lib/auth.ts": "5886db4b9146a6d1",
+    "plugins/projects/src/lib/auth.ts": "88d318e241a4d03c",
     "plugins/projects/src/lib/context.ts": "3d8ef880cc2cf2a4",
     "AGENTS.md": "2984d20be6c418a4"
   }

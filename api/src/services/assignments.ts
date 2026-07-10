@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Effect } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
 import type { Database } from "../db";
@@ -24,11 +24,7 @@ export function createAssignmentsService(db: Database) {
         return { data: rows };
       }),
 
-    create: (input: {
-      projectId: string;
-      contributorId: string;
-      role?: string;
-    }) =>
+    create: (input: { projectId: string; contributorId: string; role?: string }) =>
       Effect.gen(function* () {
         const contributorExists = yield* Effect.promise(() =>
           db

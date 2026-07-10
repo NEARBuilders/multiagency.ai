@@ -4,10 +4,10 @@ import type { Database } from "../db";
 import { billings, budgets } from "../db/schema";
 import type { AgencyService } from "./agency";
 import type { ListingsService } from "./listings";
+import { assembleAgencyRollups, computeAvailable, tokenIdsForRollup } from "./rollups";
 import { enrichWithChainStatus, getDaoTokenIds, getTreasuryBalances, networkOf } from "./sputnik";
-import { computeAvailable, resolveActiveListing, tokenIdsForRollup, assembleAgencyRollups } from "./rollups";
-import { NATIVE_TOKEN_ID } from "./tokens";
 import { summarizeTreasury } from "./summaries";
+import { NATIVE_TOKEN_ID } from "./tokens";
 
 export function createTreasuryService(
   db: Database,
@@ -15,10 +15,7 @@ export function createTreasuryService(
   listings: ListingsService,
 ) {
   return {
-    getPublicBalances: (
-      context: Record<string, unknown>,
-      input: { tokenIds: string[] },
-    ) =>
+    getPublicBalances: (context: Record<string, unknown>, input: { tokenIds: string[] }) =>
       Effect.gen(function* () {
         const orgAccountId = yield* agency.getDaoAccountId(context);
         try {
@@ -41,17 +38,12 @@ export function createTreasuryService(
         }
       }),
 
-    getBalances: (
-      context: Record<string, unknown>,
-      input: { tokenIds: string[] },
-    ) =>
+    getBalances: (context: Record<string, unknown>, input: { tokenIds: string[] }) =>
       Effect.gen(function* () {
         const orgId = yield* agency.getDaoAccountId(context);
-        const orgProjectIds = (
-          yield* Effect.promise(() =>
-            agency.fetchOrgProjects(orgId, context),
-          )
-        ).map((p: { id: string }) => p.id);
+        const orgProjectIds = (yield* Effect.promise(() =>
+          agency.fetchOrgProjects(orgId, context),
+        )).map((p: { id: string }) => p.id);
 
         const [balances, budgetRows, billingRows] =
           orgProjectIds.length > 0
@@ -86,12 +78,8 @@ export function createTreasuryService(
                 [] as any[],
               ];
 
-                  const bills = yield* Effect.promise(() =>
-          Promise.all(
-            (billingRows as any[]).map((b) =>
-              enrichWithChainStatus(db, b, orgId),
-            ),
-          ),
+        const bills = yield* Effect.promise(() =>
+          Promise.all((billingRows as any[]).map((b) => enrichWithChainStatus(db, b, orgId))),
         );
 
         const budgetedByToken = new Map<string, bigint>();
@@ -104,10 +92,7 @@ export function createTreasuryService(
         const paidByToken = new Map<string, bigint>();
         for (const b of bills) {
           if (b.status === "Approved") {
-            paidByToken.set(
-              b.tokenId,
-              (paidByToken.get(b.tokenId) ?? 0n) + BigInt(b.amount),
-            );
+            paidByToken.set(b.tokenId, (paidByToken.get(b.tokenId) ?? 0n) + BigInt(b.amount));
           }
         }
 
@@ -129,11 +114,7 @@ export function createTreasuryService(
     getRollups: (context: Record<string, unknown>) =>
       Effect.gen(function* () {
         const orgId = yield* agency.getDaoAccountId(context);
-        const orgProjectIds = (
-          yield* Effect.promise(() =>
-            agency.fetchOrgProjects(orgId, context),
-          )
-        )
+        const orgProjectIds = (yield* Effect.promise(() => agency.fetchOrgProjects(orgId, context)))
           .filter((p: { status: string }) => p.status !== "archived")
           .map((p: { id: string }) => p.id);
 
@@ -183,24 +164,18 @@ export function createTreasuryService(
             : new Map<string, any>();
 
         const bills = yield* Effect.promise(() =>
-          Promise.all(
-            (billingRows as any[]).map((b) =>
-              enrichWithChainStatus(db, b, orgId),
-            ),
-          ),
+          Promise.all((billingRows as any[]).map((b) => enrichWithChainStatus(db, b, orgId))),
         );
 
         const rollupArgs = {
           projectIds: orgProjectIds,
           budgetRows,
-          billingRows: bills.map(
-            (b) => ({
-              projectId: (b as any).projectId,
-              tokenId: (b as any).tokenId,
-              amount: (b as any).amount,
-              status: (b as any).status,
-            }),
-          ) as any,
+          billingRows: bills.map((b) => ({
+            projectId: (b as any).projectId,
+            tokenId: (b as any).tokenId,
+            amount: (b as any).amount,
+            status: (b as any).status,
+          })) as any,
           nearnListings,
           internalListings,
           network: networkOf(orgId),
@@ -208,9 +183,7 @@ export function createTreasuryService(
         const tokenIds = tokenIdsForRollup(rollupArgs);
         const balances =
           tokenIds.length > 0
-            ? yield* Effect.promise(() =>
-                getTreasuryBalances(orgId, tokenIds),
-              )
+            ? yield* Effect.promise(() => getTreasuryBalances(orgId, tokenIds))
             : {};
         return {
           rollups: assembleAgencyRollups({ ...rollupArgs, balances }),
