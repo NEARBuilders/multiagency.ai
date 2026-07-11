@@ -6,7 +6,9 @@ export const Route = createFileRoute("/_layout/_authenticated/dashboard")({
   beforeLoad: async ({ context }) => {
     const [session, roles] = await Promise.all([
       context.queryClient.ensureQueryData(sessionQueryOptions(context.authClient, context.session)),
-      context.queryClient.ensureQueryData(meRolesQueryOptions(context.apiClient)),
+      context.queryClient.ensureQueryData(
+        meRolesQueryOptions(context.apiClient, context.authClient),
+      ),
     ]);
 
     const isSuperAdmin = session?.user?.role === "admin";

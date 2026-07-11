@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useAuthClient } from "@/app";
 import { Button, Card, CardContent, Input, Spinner, Textarea } from "@/components";
 import { AdminError } from "@/components/admin-error";
 import { useApiClient } from "@/lib/api";
@@ -56,8 +57,9 @@ function fieldErrorMessage(err: unknown): string {
 
 function AdminSettings() {
   const apiClient = useApiClient();
+  const authClient = useAuthClient();
   const queryClient = useQueryClient();
-  const settingsQuery = useQuery(adminSettingsQueryOptions(apiClient));
+  const settingsQuery = useQuery(adminSettingsQueryOptions(apiClient, authClient));
 
   if (settingsQuery.isLoading) {
     return (

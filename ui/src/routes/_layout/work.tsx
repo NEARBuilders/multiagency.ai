@@ -2,6 +2,7 @@ import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tan
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useAuthClient } from "@/app";
 import {
   Badge,
   Button,
@@ -46,10 +47,10 @@ export const Route = createFileRoute("/_layout/work")({
   loader: async ({ context }) => {
     const [settings, projects] = await Promise.all([
       context.queryClient
-        .ensureQueryData(publicSettingsQueryOptions(context.apiClient))
+        .ensureQueryData(publicSettingsQueryOptions(context.apiClient, context.authClient))
         .catch(() => null),
       context.queryClient
-        .ensureQueryData(projectsListQueryOptions(context.apiClient))
+        .ensureQueryData(projectsListQueryOptions(context.apiClient, context.authClient))
         .catch(() => null),
     ]);
 
@@ -82,14 +83,15 @@ type ProjectListItem = {
 function WorkIndex() {
   const loaderData = Route.useLoaderData();
   const apiClient = useApiClient();
+  const authClient = useAuthClient();
   const { canAccessAdmin, isLoaded } = useMeRoles();
   const projectsQuery = useQuery({
-    ...projectsListQueryOptions(apiClient),
+    ...projectsListQueryOptions(apiClient, authClient),
     staleTime: 30_000,
     initialData: loaderData.projects ?? undefined,
   });
   const settingsQuery = useQuery({
-    ...publicSettingsQueryOptions(apiClient),
+    ...publicSettingsQueryOptions(apiClient, authClient),
     initialData: loaderData.settings ?? undefined,
   });
 

@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import { getRepository, useAuthClient } from "@/app";
 import trezuLogo from "@/assets/brand/trezu.svg";
 import trezuSymbol from "@/assets/brand/trezu-symbol.svg";
 import { Badge, Button, Card, CardContent, Empty, EmptyTitle, Skeleton } from "@/components";
 import { useApiClient } from "@/lib/api";
 import { projectsListQueryOptions } from "@/lib/queries";
-import { getRepoUrl } from "@/lib/repo";
 import { Route as RootRoute } from "../__root";
 
 const RD_W = 200;
@@ -176,7 +176,7 @@ const STANDARD = [
 export const Route = createFileRoute("/_layout/")({
   loader: async ({ context }) => {
     await context.queryClient
-      .ensureQueryData(projectsListQueryOptions(context.apiClient))
+      .ensureQueryData(projectsListQueryOptions(context.apiClient, context.authClient))
       .catch(() => null);
 
     return null;
@@ -199,12 +199,13 @@ type LandingProject = {
 
 function Landing() {
   const apiClient = useApiClient();
+  const authClient = useAuthClient();
   const loaderData = RootRoute.useLoaderData();
   const assetsUrl = loaderData?.runtimeConfig?.assetsUrl ?? "";
 
-  const projectsQuery = useQuery(projectsListQueryOptions(apiClient));
+  const projectsQuery = useQuery(projectsListQueryOptions(apiClient, authClient));
 
-  const repositoryUrl = getRepoUrl();
+  const repositoryUrl = getRepository() ?? "https://github.com/MultiAgency/dashboard";
 
   const projects = (projectsQuery.data?.data ?? []) as LandingProject[];
   const visibleProjects = projects.slice(0, 6);

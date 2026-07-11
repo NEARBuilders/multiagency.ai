@@ -5,6 +5,7 @@ import { Fragment, useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useAuthClient } from "@/app";
 import {
   Badge,
   Budget,
@@ -50,7 +51,6 @@ import { useMeRoles } from "@/hooks/use-me-roles";
 import { type ApiClient, useApiClient } from "@/lib/api";
 import { csvTimestamp, downloadCsv } from "@/lib/csv";
 import { formatTokenAmount, parseDecimalToBase, tokenSymbol } from "@/lib/format-amount";
-import { getNetwork } from "@/lib/network";
 import {
   adminContributorsListQueryOptions,
   adminProjectsListQueryOptions,
@@ -87,14 +87,16 @@ export const Route = createFileRoute("/_layout/treasury")({
   }),
   loader: async ({ context }) => {
     const tokens = await context.queryClient
-      .ensureQueryData(tokensListQueryOptions(context.apiClient))
+      .ensureQueryData(tokensListQueryOptions(context.apiClient, context.authClient))
       .catch(() => null);
 
     const tokenIds = tokens?.tokens.map((token) => token.tokenId) ?? [];
     const balances =
       tokenIds.length > 0
         ? await context.queryClient
-            .ensureQueryData(treasuryPublicBalancesQueryOptions(context.apiClient, tokenIds))
+            .ensureQueryData(
+              treasuryPublicBalancesQueryOptions(context.apiClient, context.authClient, tokenIds),
+            )
             .catch(() => null)
         : null;
 
@@ -142,8 +144,9 @@ function TreasuryPage() {
     updateSearch({ view: v === "grid" ? undefined : v });
   const setProposalsFilter = (next: ProposalsFilter) => updateSearch(filterToSearch(next));
 
+  const authClient = useAuthClient();
   const tokensQuery = useQuery({
-    ...tokensListQueryOptions(apiClient),
+    ...tokensListQueryOptions(apiClient, authClient),
     initialData: loaderData.tokens ?? undefined,
   });
 
@@ -151,7 +154,7 @@ function TreasuryPage() {
   const tokenIds = tokens.map((t) => t.tokenId);
 
   const balancesQuery = useQuery({
-    ...treasuryPublicBalancesQueryOptions(apiClient, tokenIds),
+    ...treasuryPublicBalancesQueryOptions(apiClient, authClient, tokenIds),
     initialData: loaderData.balances ?? undefined,
   });
 
@@ -172,7 +175,11 @@ function TreasuryPage() {
     : tokens.filter((t) => isNonZero(balanceByToken.get(t.tokenId) ?? "0"));
 
   const proposalsQuery = useInfiniteQuery({
-    queryKey: ["proposals", canAccessAdmin ? "list" : "list", getNetwork()] as const,
+    queryKey: [
+      "proposals",
+      canAccessAdmin ? "list" : "list",
+      authClient.near.getNetwork(),
+    ] as const,
     queryFn: ({ pageParam }) =>
       canAccessAdmin
         ? apiClient.proposals.list({ limit: 50, fromIndex: pageParam })
@@ -182,7 +189,7 @@ function TreasuryPage() {
     staleTime: 30_000,
     retry: false,
   });
-  const settingsQuery = useQuery(publicSettingsQueryOptions(apiClient));
+  const settingsQuery = useQuery(publicSettingsQueryOptions(apiClient, authClient));
   const orgAccountId = settingsQuery.data?.orgAccountId ?? null;
   const proposals = useMemo(
     () => proposalsQuery.data?.pages.flatMap((p) => p.data) ?? [],
@@ -591,8 +598,14 @@ function TokenDetailDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const apiClient = useApiClient();
+  const authClient = useAuthClient();
   const storageQuery = useQuery({
-    queryKey: ["tokens", "storage-status", getNetwork(), token?.tokenId ?? ""] as const,
+    queryKey: [
+      "tokens",
+      "storage-status",
+      authClient.near.getNetwork(),
+      token?.tokenId ?? "",
+    ] as const,
     queryFn: () => apiClient.tokens.getStorageStatus({ tokenId: token?.tokenId ?? "" }),
     enabled: !!token,
     staleTime: 60_000,
