@@ -1,23 +1,16 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { AppNotFound, AppRouteError, Shell } from "@/components/shell";
-import { meRolesQueryOptions, publicSettingsQueryOptions } from "@/lib/queries";
+import { meRolesQueryOptions } from "@/lib/queries";
 
 export const Route = createFileRoute("/_layout")({
+  head: () => ({ meta: [{ name: "theme-color", content: "#ffff33" }] }),
   beforeLoad: async ({ context }) => {
-    await Promise.all([
-      context.queryClient
-        .ensureQueryData(publicSettingsQueryOptions(context.apiClient))
-        .catch(() => {}),
-      context.session
-        ? context.queryClient
-            .ensureQueryData(meRolesQueryOptions(context.apiClient))
-            .catch(() => {})
-        : Promise.resolve(),
-    ]);
+    if (context.session) {
+      await context.queryClient
+        .ensureQueryData(meRolesQueryOptions(context.apiClient))
+        .catch(() => {});
+    }
   },
-  head: () => ({
-    meta: [{ name: "theme-color", content: "#ffff33" }],
-  }),
   component: Layout,
   notFoundComponent: LayoutNotFound,
   errorComponent: LayoutError,

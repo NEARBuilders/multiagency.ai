@@ -1,5 +1,11 @@
+/**
+ * Rspack configuration with Module Federation for the API remote.
+ *
+ * BE CAREFUL MODIFYING THIS FILE — changes will be overwritten by `bos sync` / `bos upgrade`.
+ * Prefer upstream changes at https://github.com/nearbuilders/everything-dev
+ */
+
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import DrizzleORMMigrations from "@proj-airi/unplugin-drizzle-orm-migrations/rspack";
@@ -10,9 +16,6 @@ import {
 } from "every-plugin/build/rspack";
 import { computeSriHashForUrl } from "everything-dev/integrity";
 import { withZephyr } from "zephyr-rspack-plugin";
-
-const require = createRequire(import.meta.url);
-const pkg = require("./package.json");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,15 +37,10 @@ function readBosConfig() {
 
 const _bosConfig = readBosConfig();
 
-function updateHostConfig(name, url, integrity) {
+function updateHostConfig(url, integrity) {
   try {
     const configPath = path.resolve(__dirname, "../bos.config.json");
     const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-
-    if (config.app.api.name !== name) {
-      console.error(`   ❌ API "${name}" not found in bos.config.json`);
-      return;
-    }
 
     config.app.api.production = url;
     if (integrity) {
@@ -81,7 +79,7 @@ export default shouldDeploy
         onDeployComplete: async (info) => {
           console.log("🚀 API Deployed:", info.url);
           const integrity = await computeSriHashForUrl(info.url);
-          updateHostConfig(pkg.name, info.url, integrity ?? undefined);
+          updateHostConfig(info.url, integrity ?? undefined);
         },
       },
     })(baseConfig)

@@ -1,3 +1,11 @@
+/**
+ * HTML shell — head/scripts/styles, runtime config handoff.
+ * Root boundary between the host-rendered document and the UI application.
+ *
+ * BE CAREFUL MODIFYING THIS FILE — changes will be overwritten by `bos sync` / `bos upgrade`.
+ * Prefer upstream changes at https://github.com/nearbuilders/everything-dev
+ */
+
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import {
   ClientOnly,
@@ -11,9 +19,9 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { getRemoteScripts } from "everything-dev/ui/head";
 import { getSocialImageMeta } from "everything-dev/ui/metadata";
 import { ThemeProvider } from "next-themes";
-import { Toaster } from "sonner";
 import type { RouterContext } from "@/app";
 import { getBaseStyles } from "@/app";
+import { Toaster } from "@/components/ui/sonner";
 import { sessionQueryKey } from "@/lib/auth";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 
@@ -22,8 +30,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     const session = context.session;
 
     return {
-      assetsUrl: context.assetsUrl || "",
       runtimeConfig: context.runtimeConfig,
+      cspNonce: context.cspNonce,
       session,
     };
   },
@@ -31,27 +39,26 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     const { queryClient } = context;
     const session = context.session;
 
-    // Pre-populate session cache from SSR data
     if (session && queryClient) {
       queryClient.setQueryData(sessionQueryKey, session);
     }
 
     return {
-      assetsUrl: context.assetsUrl || "",
       runtimeConfig: context.runtimeConfig,
+      cspNonce: context.cspNonce,
       session,
     };
   },
   head: ({ loaderData }) => {
-    const assetsUrl = loaderData?.assetsUrl || "";
     const runtimeConfig = loaderData?.runtimeConfig;
+    const cspNonce = loaderData?.cspNonce;
     const runtimeBasePath = runtimeConfig?.runtime?.runtimeBasePath ?? "/";
+    const assetsUrl = runtimeConfig?.assetsUrl?.replace(/\/$/, "");
     const siteUrl = runtimeConfig?.hostUrl
       ? `${runtimeConfig.hostUrl}${runtimeBasePath === "/" ? "" : runtimeBasePath}`
       : "";
     const title = runtimeConfig?.runtime?.title ?? runtimeConfig?.account ?? "";
     const description = runtimeConfig?.runtime?.description ?? "";
-    const ogImage = `${assetsUrl}/metadata.png`;
 
     const structuredData = {
       "@context": "https://schema.org",
@@ -81,7 +88,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         { name: "format-detection", content: "telephone=no" },
         { name: "robots", content: "index, follow" },
         ...getSocialImageMeta({
-          imageUrl: ogImage,
+          imageUrl: "/metadata.png",
           title,
           description,
           siteName: title,
@@ -90,32 +97,35 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         }),
       ],
       links: [
-        { rel: "stylesheet", href: `${assetsUrl}/static/css/async/style.css` },
+        {
+          rel: "stylesheet",
+          href: `${assetsUrl ?? ""}/static/css/style.css${runtimeConfig?.ui?.integrity ? `?v=${encodeURIComponent(runtimeConfig.ui.integrity)}` : ""}`,
+        },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         {
           rel: "preconnect",
           href: "https://fonts.gstatic.com",
           crossOrigin: "anonymous",
         },
-        { rel: "shortcut icon", href: `${assetsUrl}/favicon.ico` },
-        { rel: "icon", type: "image/svg+xml", href: `${assetsUrl}/icon.svg` },
-        { rel: "icon", type: "image/png", sizes: "32x32", href: `${assetsUrl}/favicon-32x32.png` },
-        { rel: "icon", type: "image/png", sizes: "16x16", href: `${assetsUrl}/favicon-16x16.png` },
+        { rel: "shortcut icon", href: "/favicon.ico" },
+        { rel: "icon", type: "image/svg+xml", href: "/icon.svg" },
+        { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32x32.png" },
+        { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png" },
         {
           rel: "apple-touch-icon",
           sizes: "180x180",
-          href: `${assetsUrl}/apple-touch-icon.png`,
+          href: "/apple-touch-icon.png",
         },
-        { rel: "manifest", href: `${assetsUrl}/manifest.json` },
+        { rel: "manifest", href: "/manifest.json" },
         ...(siteUrl ? [{ rel: "canonical", href: siteUrl }] : []),
       ],
       scripts: [
         ...getRemoteScripts({
-          assetsUrl,
           runtimeConfig: runtimeConfig ?? undefined,
           containerName: "ui",
           hydratePath: "./Hydrate",
           integrity: runtimeConfig?.ui?.integrity,
+          cspNonce,
         }),
         {
           type: "application/ld+json",
@@ -130,14 +140,15 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootComponent() {
+  const { cspNonce } = Route.useRouteContext();
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <style dangerouslySetInnerHTML={{ __html: getBaseStyles() }} />
+        <style nonce={cspNonce} dangerouslySetInnerHTML={{ __html: getBaseStyles() }} />
       </head>
       <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={cspNonce}>
           <div id="root">
             <Outlet />
           </div>

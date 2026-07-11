@@ -5,9 +5,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { listings as listingsTable } from "../../src/db/schema";
 import {
   attachNearnListing,
+  createInternalListing,
+  deleteInternalListing,
   detachNearnListing,
   refreshNearnListing,
   setListingsArchived,
+  updateInternalListing,
 } from "../../src/services/listings";
 import type { NearnListing } from "../../src/services/nearn";
 import { applyAllMigrations } from "./_pg";
@@ -31,11 +34,42 @@ function sample(slug: string, overrides: Partial<NearnListing> = {}): NearnListi
     status: "OPEN",
     token: "NEAR",
     rewardAmount: 100,
+    compensationType: "fixed",
+    minRewardAsk: null,
+    maxRewardAsk: null,
+    submissionLimit: "single",
+    totalPaymentsMade: null,
+    totalWinnersSelected: null,
+    rewards: null,
+    maxBonusSpots: null,
+    usdValue: null,
+    skills: null,
+    region: null,
+    applicationType: null,
+    multipleSubmissionRule: null,
+    timeToComplete: null,
+    requirements: null,
+    sequentialId: null,
+    nearnPublishedAt: null,
+    isFeatured: null,
+    isPrivate: null,
+    isHackathonPrize: null,
+    hackathonSlug: null,
+    hackathonName: null,
+    hackathonStartDate: null,
+    hackathonAnnounceDate: null,
     deadline: null,
     isPublished: true,
     isArchived: false,
     isWinnersAnnounced: false,
-    sponsor: { name: "Agency", slug: "agency", logo: null, isVerified: true },
+    sponsor: {
+      name: "Agency",
+      slug: "agency",
+      logo: null,
+      isVerified: true,
+      entityName: null,
+      isCaution: null,
+    },
     ...overrides,
   };
 }
@@ -237,5 +271,145 @@ describe("listings cache invalidation", () => {
       .from(listingsTable)
       .where(eq(listingsTable.projectId, PROJECT_A));
     expect(aAfter.every((r) => r.isArchived === false)).toBe(true);
+  });
+});
+
+describe("internal listings CRUD", () => {
+  let pg: PGlite;
+  let db: ReturnType<typeof drizzle>;
+
+  beforeEach(async () => {
+    const { PGlite } = await import("@electric-sql/pglite");
+    pg = new PGlite("memory://");
+    await applyAllMigrations(pg);
+    db = drizzle(pg);
+  });
+
+  afterEach(async () => {
+    await pg.close();
+  });
+
+  test("createInternalListing inserts a row with source=internal and null externalId/syncedAt", async () => {
+    const row = await createInternalListing(
+      PROJECT_A,
+      {
+        title: "Build the agency portal",
+        type: "Project",
+        token: "NEAR",
+        rewardAmount: "500",
+        description: "Internal scope for the bootstrap sprint",
+        isPublished: true,
+      },
+      db as never,
+    );
+    expect(row.projectId).toBe(PROJECT_A);
+    expect(row.source).toBe("internal");
+    expect(row.externalId).toBeNull();
+    expect(row.syncedAt).toBeNull();
+    expect(row.title).toBe("Build the agency portal");
+    expect(row.type).toBe("Project");
+    expect(row.token).toBe("NEAR");
+    expect(row.rewardAmount).toBe("500");
+    expect(row.isPublished).toBe(true);
+    expect(row.isArchived).toBe(false);
+    expect(row.isWinnersAnnounced).toBe(false);
+  });
+
+  test("createInternalListing rejects a second internal row for the same project (unique constraint)", async () => {
+    await createInternalListing(
+      PROJECT_A,
+      { title: "First", type: "Bounty", token: "NEAR", rewardAmount: "100" },
+      db as never,
+    );
+    await expect(
+      createInternalListing(
+        PROJECT_A,
+        { title: "Second", type: "Bounty", token: "NEAR", rewardAmount: "200" },
+        db as never,
+      ),
+    ).rejects.toThrow();
+  });
+
+  test("internal and NEARN rows coexist for the same project (per SPEC §82)", async () => {
+    const slug = uniqueSlug();
+    globalThis.fetch = vi.fn(() => Promise.resolve(nearnResponse(sample(slug)))) as never;
+    await attachNearnListing(PROJECT_A, slug, db as never);
+    await createInternalListing(
+      PROJECT_A,
+      { title: "Internal", type: "Project", token: "NEAR", rewardAmount: "300" },
+      db as never,
+    );
+
+    const rows = await db
+      .select()
+      .from(listingsTable)
+      .where(eq(listingsTable.projectId, PROJECT_A));
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.source).sort()).toEqual(["internal", "nearn"]);
+  });
+
+  test("updateInternalListing partial-updates and bumps updatedAt", async () => {
+    const created = await createInternalListing(
+      PROJECT_A,
+      { title: "Initial", type: "Bounty", token: "NEAR", rewardAmount: "100" },
+      db as never,
+    );
+    const originalUpdatedAt = created.updatedAt;
+    // Force a measurable updatedAt delta — pg's now() has sub-ms resolution but
+    // the patch path explicitly sets `new Date()`, so a 5ms wait is enough.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const updated = await updateInternalListing(
+      PROJECT_A,
+      { isWinnersAnnounced: true, rewardAmount: "150" },
+      db as never,
+    );
+    expect(updated).not.toBeNull();
+    expect(updated?.title).toBe("Initial");
+    expect(updated?.isWinnersAnnounced).toBe(true);
+    expect(updated?.rewardAmount).toBe("150");
+    expect(updated?.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
+  });
+
+  test("updateInternalListing with no patch fields returns the existing row unchanged", async () => {
+    const created = await createInternalListing(
+      PROJECT_A,
+      { title: "Initial", type: "Bounty", token: "NEAR", rewardAmount: "100" },
+      db as never,
+    );
+    const result = await updateInternalListing(PROJECT_A, {}, db as never);
+    expect(result?.id).toBe(created.id);
+    expect(result?.updatedAt.getTime()).toBe(created.updatedAt.getTime());
+  });
+
+  test("updateInternalListing returns null when no internal row exists for the project", async () => {
+    const result = await updateInternalListing(PROJECT_A, { title: "Nope" }, db as never);
+    expect(result).toBeNull();
+  });
+
+  test("deleteInternalListing removes only the internal-source row for that project", async () => {
+    const slug = uniqueSlug();
+    globalThis.fetch = vi.fn(() => Promise.resolve(nearnResponse(sample(slug)))) as never;
+    await attachNearnListing(PROJECT_A, slug, db as never);
+    await createInternalListing(
+      PROJECT_A,
+      { title: "Internal", type: "Project", token: "NEAR", rewardAmount: "100" },
+      db as never,
+    );
+
+    const removed = await deleteInternalListing(PROJECT_A, db as never);
+    expect(removed).toBe(true);
+
+    const remaining = await db
+      .select()
+      .from(listingsTable)
+      .where(eq(listingsTable.projectId, PROJECT_A));
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.source).toBe("nearn");
+  });
+
+  test("deleteInternalListing returns false when no internal row exists", async () => {
+    const removed = await deleteInternalListing(PROJECT_A, db as never);
+    expect(removed).toBe(false);
   });
 });

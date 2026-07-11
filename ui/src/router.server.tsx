@@ -1,3 +1,11 @@
+/**
+ * SSR router factory — creates request-scoped server router and server-side
+ * API/auth clients per request. Mirrors the client router shape for hydration consistency.
+ *
+ * BE CAREFUL MODIFYING THIS FILE — changes will be overwritten by `bos sync` / `bos upgrade`.
+ * Prefer upstream changes at https://github.com/nearbuilders/everything-dev
+ */
+
 import { dehydrate, hydrate, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter as createTanStackRouter } from "@tanstack/react-router";
 import {
@@ -57,18 +65,25 @@ const createRouter = (opts: CreateRouterOptions) => {
 
   const history = opts.history ?? createMemoryHistory();
 
+  const cspNonce = opts.context.cspNonce;
   const router = createTanStackRouter({
     routeTree,
     history,
     basepath: opts.basepath,
     context: {
       queryClient,
-      assetsUrl: opts.context.assetsUrl,
       runtimeConfig: opts.context.runtimeConfig,
       apiClient: opts.context.apiClient,
-      authClient: opts.context.authClient ?? createAuthClient(opts.context.runtimeConfig),
+      authClient:
+        opts.context.authClient ??
+        createAuthClient({
+          runtimeConfig: opts.context.runtimeConfig,
+          cspNonce: opts.context.cspNonce,
+        }),
       session: opts.context.session,
+      cspNonce,
     },
+    ...(cspNonce ? { ssr: { nonce: cspNonce } } : {}),
     defaultPreload: "intent",
     scrollRestoration: true,
     defaultStructuralSharing: true,
@@ -107,12 +122,12 @@ const getRouteHead = async (pathname: string, context?: Partial<RouterContext>) 
     history,
     context: {
       queryClient,
-      assetsUrl: context?.assetsUrl ?? "",
       runtimeConfig,
       apiClient:
         context?.apiClient ??
         createApiClient({ hostUrl: runtimeConfig.hostUrl, rpcBase: runtimeConfig.rpcBase }),
-      authClient: context?.authClient ?? createAuthClient(runtimeConfig),
+      authClient:
+        context?.authClient ?? createAuthClient({ runtimeConfig, cspNonce: context?.cspNonce }),
       session: context?.session,
     },
   });
@@ -145,11 +160,15 @@ const renderToStream = async (request: Request, renderOptions: RenderOptions) =>
         basepath: renderOptions.basepath,
         context: {
           queryClient: localQueryClient,
-          assetsUrl: renderOptions.assetsUrl,
           runtimeConfig: renderOptions.runtimeConfig,
           apiClient: renderOptions.apiClient,
-          authClient: renderOptions.authClient ?? createAuthClient(renderOptions.runtimeConfig),
+          authClient: createAuthClient({
+            runtimeConfig: renderOptions.runtimeConfig,
+            headers: request.headers,
+            cspNonce: renderOptions.cspNonce,
+          }),
           session: renderOptions.session,
+          cspNonce: renderOptions.cspNonce,
         },
       });
       queryClientRef = localQueryClient;

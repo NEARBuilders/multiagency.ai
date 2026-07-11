@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths-ignore:
       - "**.md"
+      - "docs/**"
       - ".changeset/**"
   pull_request:
   workflow_dispatch:
@@ -36,9 +37,13 @@ jobs:
           bun-version: "1.2.20"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Run postinstall
+        run: bun run postinstall
 
       - name: Security audit
+        id: audit
         run: |
           bun audit 2>&1 | tee audit-output.txt
           if grep -qiE '(critical|high)' audit-output.txt; then
@@ -55,3 +60,6 @@ jobs:
 
       - name: Run typecheck
         run: bun typecheck
+
+      - name: Run tests
+        run: bun run test

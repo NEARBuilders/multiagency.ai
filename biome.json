@@ -29,6 +29,9 @@
     "lineWidth": 100
   },
   "css": {
+    "parser": {
+      "tailwindDirectives": true
+    },
     "formatter": {
       "enabled": false
     },
@@ -51,8 +54,7 @@
       "!!**/plugins/**/types/**/*.d.ts",
       "!!**/env.d.ts",
       "!!**/virtual-modules.d.ts",
-      "!!bos.config.json",
-      "!!api/src/db/migrations"
+      "!!bos.config.json"
     ],
     "ignoreUnknown": true
   },
