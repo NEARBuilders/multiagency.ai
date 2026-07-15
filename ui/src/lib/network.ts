@@ -14,7 +14,8 @@ function authClient(): AuthClient {
 }
 
 export function getNetwork(): Network {
-  return authClient().near.getNetwork();
+  if (!_authClient) return "testnet";
+  return _authClient.near.getNetwork();
 }
 
 export async function setNetwork(network: Network): Promise<void> {
